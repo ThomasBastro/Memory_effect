@@ -1,0 +1,14 @@
+{
+  "name": "PyCBC VSCode",
+  "image": "pycbc/pycbc-el8:latest",
+  "workspaceFolder": "/home/pycbc/work",
+  "remoteUser": "pycbc",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/home/pycbc/work,type=bind"
+  ],
+  "extensions": [
+    "ms-python.python",
+    "ms-toolsai.jupyter"
+  ],
+  "forwardPorts": [8888]
+}
