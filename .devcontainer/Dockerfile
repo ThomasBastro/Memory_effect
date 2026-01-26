@@ -1,7 +1,8 @@
 FROM pycbc/pycbc-el8:latest
 
-# Installer des paquets Python utiles
-RUN pip install --no-cache-dir ipykernel matplotlib
+# Installer les dépendances globales nécessaires
+RUN pip install --no-cache-dir ipykernel matplotlib numpy scipy pandas 
+    gwmemory gwsurrogate
+ENV GWSURROGATE_DIR=/home/pycbc/gwsurrogate_downloads
 
-# Exemple: installer un approximant additionnel via lalsuite s’il n’est pas déjà inclus
-# RUN pip install lalsuite
+

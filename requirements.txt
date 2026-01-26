@@ -1,0 +1,7 @@
+numpy
+matplotlib
+gwmemory
+gwsurrogate
+lalsuite
+scipy
+pandas
