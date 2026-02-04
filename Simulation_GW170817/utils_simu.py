@@ -585,7 +585,7 @@ def compute_memory_vs_time_TT(t_s, e_J, npix, pix, obs_dir, nside=64, distance_M
 
         h_memory_vs_time[t_idx] = h_total_at_time
 
-    # --- Create the plot (LINEAR PLOT) ---
+    # --- Create the plot ---
     plt.figure(figsize=(12, 10))
     
     # Filter valid values to avoid plotting NaNs due to division/TT or errors
