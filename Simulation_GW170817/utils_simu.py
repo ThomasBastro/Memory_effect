@@ -516,7 +516,7 @@ import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
 
-def compute_memory_vs_time_TT(t_s, e_J, npix, pix, obs_dir, nside=64, distance_Mpc=40.0, nbins_time=1000):
+def compute_memory_vs_time_TT(t_s, e_J, npix, pix, obs_dir, nside=64, distance_Mpc=40.0, nbins_time=1000, plot=True):
     """
     Computes the linear TT memory effect as a function of time
     """
@@ -586,44 +586,45 @@ def compute_memory_vs_time_TT(t_s, e_J, npix, pix, obs_dir, nside=64, distance_M
         h_memory_vs_time[t_idx] = h_total_at_time
 
     # --- Create the plot ---
-    plt.figure(figsize=(12, 10))
-    
-    # Filter valid values to avoid plotting NaNs due to division/TT or errors
-    valid_mask = np.isfinite(h_memory_vs_time)
-    # Compute the observer's angle in spherical coordinates
-    obs_theta = np.arccos(obs_dir[2])
-    obs_phi = np.arctan2(obs_dir[1], obs_dir[0])
-    
-    if np.any(valid_mask):
-        # Plot
-        plt.subplot(2, 1, 1)
-        plt.semilogx(t_centers_days[valid_mask], h_memory_vs_time[valid_mask], 
-                'b-', linewidth=2)
-        plt.xlabel('t(days)')
-        plt.ylabel('Memory (strain)')
-        plt.title(' Memory Amplitude Evolution - TT Gauge for observer at ' +
-                  rf'$\theta$={np.degrees(obs_theta):.1f}°, $\phi$={np.degrees(obs_phi):.1f}°')
-        plt.grid(True, alpha=0.3)
-
-        # Display the final cumulative value
-        max_memory = h_memory_vs_time[valid_mask][-1]
-        plt.text(
-            0.98, 0.02,
-            f"Max memory (end): {max_memory:.2e}",
-            transform=plt.gca().transAxes,
-            fontsize=16,
-            color='black',
-            ha='right',
-            va='bottom',
-            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none')
-        )
+    if plot:
+        plt.figure(figsize=(12, 10))
         
-    # Save
-    #outdir = "gw170817_memory_outputs"
-    #import os
-    #os.makedirs(outdir, exist_ok=True)
-    #plt.savefig(f"{outdir}/memory_vs_time_TT_linear.png", dpi=150, bbox_inches='tight')
-    plt.show()
+        # Filter valid values to avoid plotting NaNs due to division/TT or errors
+        valid_mask = np.isfinite(h_memory_vs_time)
+        # Compute the observer's angle in spherical coordinates
+        obs_theta = np.arccos(obs_dir[2])
+        obs_phi = np.arctan2(obs_dir[1], obs_dir[0])
+        
+        if np.any(valid_mask):
+            # Plot
+            plt.subplot(2, 1, 1)
+            plt.semilogx(t_centers_days[valid_mask], h_memory_vs_time[valid_mask], 
+                    'b-', linewidth=2)
+            plt.xlabel('t(days)')
+            plt.ylabel('Memory (strain)')
+            plt.title(' Memory Amplitude Evolution - TT Gauge for observer at ' +
+                    rf'$\theta$={np.degrees(obs_theta):.1f}°, $\phi$={np.degrees(obs_phi):.1f}°')
+            plt.grid(True, alpha=0.3)
+
+            # Display the final cumulative value
+            max_memory = h_memory_vs_time[valid_mask][-1]
+            plt.text(
+                0.98, 0.02,
+                f"Max memory (end): {max_memory:.2e}",
+                transform=plt.gca().transAxes,
+                fontsize=16,
+                color='black',
+                ha='right',
+                va='bottom',
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none')
+            )
+            
+        # Save
+        #outdir = "gw170817_memory_outputs"
+        #import os
+        #os.makedirs(outdir, exist_ok=True)
+        #plt.savefig(f"{outdir}/memory_vs_time_TT_linear.png", dpi=150, bbox_inches='tight')
+        plt.show()
     
     return t_centers_days, h_memory_vs_time
 
