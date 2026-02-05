@@ -4,6 +4,11 @@ from lal import MSUN_SI, PC_SI, C_SI, G_SI
 
 outdir = "./figures/"
 
+def model_exponential(t, delta_h, tau):
+    return delta_h / (1 + np.exp(-t / tau))
+def model_tanh(t, delta_h, tau):
+    return delta_h * 0.5 * np.tanh(t/tau) + delta_h * 0.5
+
 def phenom_memory_models(tau, M_ej_dyn, v_ej_dyn, r, t, model, plot):
     """
     Compare exponential (Lopez et al.) and tanh (Favata) models for dynamical ejecta memory.
@@ -37,9 +42,9 @@ def phenom_memory_models(tau, M_ej_dyn, v_ej_dyn, r, t, model, plot):
     M_ej_dyn = M_ej_dyn * MSUN_SI  # Convert mass from solar masses to kg
     delta_h_dyn = 2 * G_SI / (C_SI**4 * r) * M_ej_dyn * v_ej_dyn**2
     if model == 'exponential':
-        h = delta_h_dyn / (1 + np.exp(-t / tau))
+        h = model_exponential(t, delta_h_dyn, tau)
     if model == 'tanh':
-        h = delta_h_dyn * 0.5 * np.tanh(t/tau) + delta_h_dyn * 0.5
+        h = model_tanh(t, delta_h_dyn, tau)
     if plot:
         plt.figure(figsize=(8,5))
         plt.plot(t, h)
@@ -89,9 +94,9 @@ def phenom_memory_ejecta_components(
     def linear_memory_ejecta_masked(t, M_ej, v_ej, tau, r, start_ms, end_ms, model='exponential'):
         delta_h = 2 * G_SI / (C_SI**4 * r) * M_ej * v_ej**2
         if model == 'exponential':
-            h_t = delta_h / (1 + np.exp(-t / tau))
+            h_t = model_exponential(t, delta_h, tau)
         elif model == 'tanh':
-            h_t = delta_h * 0.5 * np.tanh(t/tau) + delta_h * 0.5
+            h_t = model_tanh(t, delta_h, tau)
         else:
             raise ValueError("Model must be 'exponential' or 'tanh'")
         h_masked = np.zeros_like(t)
@@ -159,4 +164,47 @@ def phenom_memory_ejecta_components(
         plt.savefig(outdir + f"linear_memory_ejecta_components_{model}_Mejdyn{M_ej_dyn/MSUN_SI:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_Mejwind{M_ej_wind/MSUN_SI:.2f}_vejwind{v_ej_wind/C_SI:.2f}_tau{tau_wind:.0e}.png")
         plt.show()
         # Save the figure
+
+def phenom_memory_GRB(t, E_j, beta, theta, r, tau_GRB, model='exponential', plot=False):
+    """
+    Compute the linear memory from a GRB jet using a phenomenological model.
+    
+    Parameters:
+    - t: time array 
+    - E_j: energy released in the jet (Joules)
+    - beta: velocity of the jet in units of c
+    - theta: angle between the jet axis and the line of sight (radians)
+    - r: distance to the source (meters)
+    - tau_GRB: characteristic timescale of the GRB memory signal 
+    - model: 'exponential' or 'tanh' for the time evolution of the memory signal
+    - plot: whether to plot the memory signal
+    
+    Returns:
+    - t: time array 
+    - h_GRB: memory signal as a function of time
+    """
+    # Calculate the amplitude of the memory signal
+    delta_h = (G_SI/C_SI**4) * (2 * E_j * beta**2 / r) * (np.sin(theta)**2 / (1 - beta * np.cos(theta)))
+    
+    # Generate the time evolution of the memory signal
+    if model == 'exponential':
+        h_GRB = model_exponential(t, delta_h, tau_GRB)
+    elif model == 'tanh':
+        h_GRB = model_tanh(t, delta_h, tau_GRB)
+    else:
+        raise ValueError("Model must be 'exponential' or 'tanh'")
+    
+    if plot:
+        plt.figure(figsize=(8, 5))
+        plt.plot(t, h_GRB, label=f'GRB Memory ({model} model)', color='orange')
+        plt.xlabel("t (s)")
+        plt.ylabel(r"$h(t)$")
+        plt.title(f"Linear memory from a GRB \n $\\tau_{{GRB}}$ = {tau_GRB:.0f}s")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(outdir + f"phenom_memory_GRB_Ej{E_j:.2e}_beta{beta:.2f}_theta{theta:.2f}_tau{tau_GRB:.0e}_{model}.png")
+        plt.show()
         
+        
+    
+    return t, h_GRB
