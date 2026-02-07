@@ -1,7 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 from lal import MSUN_SI, PC_SI, C_SI, G_SI
 from matplotlib.ticker import FixedLocator, LogLocator
+
+import LISA as li
+lisa = li.LISA() # initialize LISA object
+f_lisa = np.logspace(np.log10(1.0e-5), np.log10(1.0e0), 1000)
+Sn_lisa = lisa.Sn(f_lisa)
+
 outdir = "./figures/"
 
 def model_exponential(t, delta_h, tau):
@@ -9,9 +16,58 @@ def model_exponential(t, delta_h, tau):
 def model_tanh(t, delta_h, tau):
     return delta_h * 0.5 * np.tanh(t/tau) + delta_h * 0.5
 
+def delta_h_ejecta(M_ej, v_ej, r):
+    """
+    Compute the memory amplitude from ejecta mass and velocity.
+    The mass is in unit of solar mass, velocity in unit of c, distance in parsecs.
+
+    Parameters:
+    -----------
+    M_ej : float
+        Ejecta mass in solar mass
+    v_ej : float
+        Ejecta velocity (m/s)
+    r : float
+        Distance to source (parsecs)
+    Returns:
+    --------
+    delta_h : float
+        Memory amplitude (strain)
+    """
+    r = r * PC_SI  # Convert distance from parsecs to meters
+    M_ej = M_ej * MSUN_SI  # Convert mass from solar masses to kg
+    v_ej = v_ej * C_SI  # Convert velocity from c to m/s
+    delta_h = 2 * G_SI / (C_SI**4 * r) * M_ej * v_ej**2
+    return delta_h
+def delta_h_GRB(E_j, beta, theta, r):
+    """
+    Compute the memory amplitude from GRB jet parameters.
+    The energy is in erg , velocity in units of c, distance in parsecs.
+
+    Parameters:
+    -----------
+    E_j : float
+        Energy of the GRB jet (erg)
+    beta : float
+        Velocity of the jet (in units of c)
+    theta : float
+        Angle of the jet (radians)
+    r : float
+        Distance to source (parsecs)
+    Returns:
+    --------
+    delta_h_GRB : float
+        Memory amplitude from the GRB jet (strain)
+    """
+    E_j = E_j * 1e-7  # Convert energy from erg to Joules
+    r = r * PC_SI  # Convert distance from parsecs to meters
+    delta_h_GRB = (G_SI/C_SI**4) * (2 * E_j * beta**2 / r) * (np.sin(theta)**2 / (1 - beta * np.cos(theta)))
+    return delta_h_GRB
+
 def phenom_memory_models(tau, M_ej_dyn, v_ej_dyn, r, t, model, plot):
     """
     Compare exponential (Lopez et al.) and tanh (Favata) models for dynamical ejecta memory.
+    The mass is in unit of solar mass, velocity in unit of c, distance in parsecs, time in seconds, and tau in seconds.
 
     Parameters:
     -----------
@@ -25,8 +81,6 @@ def phenom_memory_models(tau, M_ej_dyn, v_ej_dyn, r, t, model, plot):
         Distance to source (parsecs)
     t : array
         Time array (s)
-    G_SI, C_SI, MSUN_SI, PC_SI : float
-        Physical constants
     model : str
         Model type ('exponential' or 'tanh')
     plot : bool
@@ -40,6 +94,7 @@ def phenom_memory_models(tau, M_ej_dyn, v_ej_dyn, r, t, model, plot):
     """
     r = r * PC_SI  # Convert distance from parsecs to meters
     M_ej_dyn = M_ej_dyn * MSUN_SI  # Convert mass from solar masses to kg
+    v_ej_dyn = v_ej_dyn * C_SI  # Convert velocity from c to m/s
     delta_h_dyn = 2 * G_SI / (C_SI**4 * r) * M_ej_dyn * v_ej_dyn**2
     if model == 'exponential':
         h = model_exponential(t, delta_h_dyn, tau)
@@ -54,11 +109,41 @@ def phenom_memory_models(tau, M_ej_dyn, v_ej_dyn, r, t, model, plot):
         plt.legend(loc = 'lower right')
         plt.tight_layout()
         #Save the figure
-        plt.savefig(outdir + f"phenom_memory_models_tau{tau:.0e}_Mej{M_ej_dyn/MSUN_SI:.2f}_vej{v_ej_dyn/C_SI:.2f}_{model}.png")
+        plt.savefig(outdir + f"phenom_memory_models_tau{tau:.0e}_Mej{M_ej_dyn:.2f}_vej{v_ej_dyn/C_SI:.2f}_{model}.png")
         plt.show()
     return t, h
 
 def linear_memory_ejecta_masked(t, M_ej, v_ej, tau, r, start_ms, end_ms, model='exponential'):
+    """
+    Compute linear memory from ejecta with masking for active and after phases.
+    The mass is in unit of solar mass, velocity in unit of c, distance in parsecs, time in seconds, and tau in seconds.
+    Parameters:
+    -----------
+    t : array
+        Time array (s)
+    M_ej : float
+        Ejecta mass in solar mass
+    v_ej : float        Ejecta velocity (m/s)
+    tau : float
+        Characteristic timescale (s)
+    r : float
+        Distance to source (parsecs)
+    start_ms : float
+        Start time of active phase (ms)
+    end_ms : float
+        End time of active phase (ms)
+    model : str
+        Model type ('exponential' or 'tanh')
+    Returns:
+    --------    
+    h_masked : array
+        Memory strain array with masking applied
+    """
+    # Convert parameters to SI units
+    r = r * PC_SI  # Convert distance from parsecs to meters
+    M_ej = M_ej * MSUN_SI  # Convert mass from solar masses to kg
+    v_ej = v_ej * C_SI  # Convert velocity from c to m/s
+    
     delta_h = 2 * G_SI / (C_SI**4 * r) * M_ej * v_ej**2
     if model == 'exponential':
         h_t = model_exponential(t, delta_h, tau)
@@ -88,6 +173,7 @@ def phenom_memory_ejecta_components(
 ):
     """
     Plot linear memory from two ejecta components (dynamical + wind) with masks and custom parameters.
+    The mass is in unit of solar mass, velocity in unit of c, distance in parsecs, time in seconds, and tau in seconds.
 
     Parameters
     ----------
@@ -108,6 +194,7 @@ def phenom_memory_ejecta_components(
     delta_h_typical : float
         Typical value for reference line (default: 3.8e-25)
     """
+
     # Compute memory for both components (dynamical and wind) with masking 
     h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, end_dyn, model=model)
     h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, end_wind, model=model)
@@ -162,18 +249,19 @@ def phenom_memory_ejecta_components(
              rf"Phenomenological model for $\tau_{{dyn}} = {tau_dyn}$ ms and $\tau_{{wind}} = {tau_wind}$ ms", 
              fontsize=18, fontweight='bold', y=1.05)
         plt.tight_layout()
-        plt.savefig(outdir + f"linear_memory_ejecta_components_{model}_Mejdyn{M_ej_dyn/MSUN_SI:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_Mejwind{M_ej_wind/MSUN_SI:.2f}_vejwind{v_ej_wind/C_SI:.2f}_tau{tau_wind:.0e}.png")
+        plt.savefig(outdir + f"linear_memory_ejecta_components_{model}_Mejdyn{M_ej_dyn:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_Mejwind{M_ej_wind:.2f}_vejwind{v_ej_wind/C_SI:.2f}_tau{tau_wind:.0e}.png")
         plt.show()
 
 
 def phenom_memory_GRB(
     t, E_j, beta, theta, r, tau_GRB, start_GRB, end_GRB, model='exponential', plot=False):
     """
-    Calcule et retourne la mémoire GRB masquée (active entre start_GRB et end_GRB, puis constante).
+    Compute and plot the linear memory from a GRB jet with masking.
+    The energy is in erg , velocity in units of c, distance in parsecs, time in seconds, and tau in seconds.
 
     Paramètres :
     - t : array, temps (ms)
-    - E_j : énergie du jet (Joules)
+    - E_j : énergie du jet (donné en erg, converti en Joules dans la fonction)
     - beta : vitesse du jet (en unités de c)
     - theta : angle du jet (radians)
     - r : distance à la source (mètres)
@@ -184,6 +272,8 @@ def phenom_memory_GRB(
     Retour :
     - h_GRB : array, signal mémoire masqué
     """
+    E_j = E_j * 1e-7  # Convert energy from erg to Joules
+    r = r * PC_SI  # Convert distance from parsecs to meters
     delta_h_GRB = (G_SI/C_SI**4) * (2 * E_j * beta**2 / r) * (np.sin(theta)**2 / (1 - beta * np.cos(theta)))
     if model == 'exponential':
         h_GRB_raw = model_exponential(t, delta_h_GRB, tau_GRB)
@@ -229,7 +319,7 @@ def phenom_memory_ejecta_components_GRB(
 ):
     """
     Plot linear memory from two ejecta components (dynamical + wind) and GRB jet
-
+    The mass is in unit of solar mass, velocity in unit of c, distance in parsecs, time in seconds, and tau in seconds.
 
     Parameters
     ----------
@@ -262,6 +352,8 @@ def phenom_memory_ejecta_components_GRB(
     outdir : str
         Output directory for figures
     """
+    # Convert in SI units
+
     # Compute memory for both ejecta components
     h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, end_dyn, model=model)
     h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, end_wind, model=model)
@@ -327,8 +419,8 @@ def phenom_memory_ejecta_components_GRB(
         )
         plt.tight_layout()
         plt.savefig(
-            outdir + f"linear_memory_ejecta_components_GRB_{model}_Mejdyn{M_ej_dyn/MSUN_SI:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_"
-            f"Mejwind{M_ej_wind/MSUN_SI:.2f}_vejwind{v_ej_wind/C_SI:.2f}_tau{tau_wind:.0e}_Ej{E_j:.2e}_beta{beta:.2f}_theta{theta:.2f}_tauGRB{tau_GRB:.0e}.png"
+            outdir + f"linear_memory_ejecta_components_GRB_{model}_Mejdyn{M_ej_dyn:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_"
+            f"Mejwind{M_ej_wind:.2f}_vejwind{v_ej_wind:.2f}_tau{tau_wind:.0e}_Ej{E_j:.2e}_beta{beta:.2f}_theta{theta:.2f}_tauGRB{tau_GRB:.0e}.png"
         )
         plt.show()
 
@@ -345,25 +437,14 @@ def phenom_memory_total_plot(
 ):
     """
     Plot only the total memory (dynamical + wind + GRB) with vertical lines for each component.
+    The mass is in unit of solar mass, velocity in unit of c, distance in parsecs, time in seconds, and tau in seconds.
 
     Parameters are the same as for phenom_memory_ejecta_components_GRB.
     """
+    # Compute memory for both ejecta components and GRB
     h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, end_dyn, model=model)
     h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, end_wind, model=model)
-    delta_h_GRB = (G_SI/C_SI**4) * (2 * E_j * beta**2 / r) * (np.sin(theta)**2 / (1 - beta * np.cos(theta)))
-    if model == 'exponential':
-        h_GRB_raw = model_exponential(t, delta_h_GRB, tau_GRB)
-    elif model == 'tanh':
-        h_GRB_raw = model_tanh(t, delta_h_GRB, tau_GRB)
-    else:
-        raise ValueError("Model must be 'exponential' or 'tanh'")
-    h_GRB = np.zeros_like(t)
-    mask_GRB_active = (t >= start_GRB) & (t <= end_GRB)
-    mask_GRB_after = t > end_GRB
-    h_GRB[mask_GRB_active] = h_GRB_raw[mask_GRB_active]
-    if np.any(mask_GRB_active):
-        last_val_GRB = h_GRB_raw[mask_GRB_active][-1]
-        h_GRB[mask_GRB_after] = last_val_GRB
+    h_GRB = phenom_memory_GRB(t, E_j, beta, theta, r, tau_GRB, start_GRB, end_GRB, model=model, plot=False)
     h_tot = h_dyn + h_wind + h_GRB
 
     import matplotlib.pyplot as plt
@@ -423,15 +504,80 @@ def phenom_memory_total_plot(
                 dpi=300, bbox_inches='tight')
     plt.show()
     return h_tot
-def memory_fft_phenom(t, h_list, plot=True, save=False, show=False, add_info_title=None, labels=None, outdir="./figures/", outdir_memory_fft="memory_fft"):
+
+def memory_fft_phenom(
+    t, h_list, plot=True, save=False, show=False, add_info_title=None, labels=None,
+    outdir="./figures/", outdir_memory_fft="memory_fft", return_fig=False, return_fft=False, LISA=False
+):
     """
     Computes and plots the FFT of one or several memory signals (t and h provided).
+    Returns a list of (frequencies, fft) for each signal.
+    """
+    from scipy.fft import fft, fftfreq
+    plt.figure(figsize=(8, 8))
+    results = []
+    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
+
+    for i, h in enumerate(h_list):
+        valid_mask = np.isfinite(h) & np.isfinite(t)
+        t_valid = t[valid_mask]
+        h_valid = h[valid_mask]
+
+        # Interpolate onto a regular grid if needed
+        t_regular = np.linspace(t_valid.min(), t_valid.max(), len(t_valid))
+        h_interp = np.interp(t_regular, t_valid, h_valid)
+        dt_mean = np.mean(np.diff(t_regular))
+
+        N = len(h_interp)
+        fft_h = fft(h_interp)
+        frequencies = fftfreq(N, dt_mean)
+        # Only positive frequencies
+        pos_mask = frequencies > 0
+        frequencies_plot = frequencies[pos_mask]
+        fft_h_plot = 2.0/N * np.abs(fft_h[pos_mask])
+
+        results.append((frequencies_plot, fft_h_plot))
+
+        if plot:
+            color = colors[i % len(colors)]
+            plt.loglog(frequencies_plot, fft_h_plot, '-', linewidth=2, color=color, label=labels[i] if labels else f"Signal {i+1}")
+
+    if plot:
+        plt.tick_params(top=True, right=True, axis='both', which='major', labelsize=12, direction='in', length=6, width=1.2)
+        plt.xlabel('f [Hz]', fontsize=14)
+        plt.ylabel('Caracteristic strain', fontsize=14)
+        if LISA:
+            plt.loglog(f_lisa, np.sqrt(f_lisa*Sn_lisa), label='LISA', color='k', linestyle='-.')
+        if add_info_title:
+            plt.title('FFT memory signal\n' + f'{add_info_title}', fontsize=15)
+        else:
+            plt.title('FFT memory signal for ejecta', fontsize=15)
+        plt.xlim(1e-6, 200)
+        if labels is not None:
+            plt.legend()
+        plt.tight_layout()
+    if save:
+        os.makedirs(os.path.join(outdir, outdir_memory_fft), exist_ok=True)
+        if add_info_title:
+            add_info_save = '_' + add_info_title
+            plt.savefig(os.path.join(outdir, outdir_memory_fft, f"memory_fft_ejecta{add_info_save}.png"), dpi=150, bbox_inches='tight')
+        else:
+            plt.savefig(os.path.join(outdir, outdir_memory_fft, "memory_fft_ejecta.png"), dpi=150, bbox_inches='tight')
+    if show:
+        plt.show()
+    if return_fig:
+        return plt.gcf(), plt.gca()
+    if return_fft:
+        return results
+def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info_title=None, outdir="./figures/", outdir_memory_fft="memory_fft", return_fig=False, LISA=False):
+    """
+    Computes and plots the FFT of a memory signal (t and h provided) based on formula (4.2) provided by https://arxiv.org/pdf/gr-qc/0405067 .
     Parameters:
     -----------
-    t : array-like
-        Time array (seconds)
-    h_list : list of array-like
-        List of memory signals as a function of time (strain)
+    delta_h : float
+        Memory amplitude (strain)
+    tau : float
+        Characteristic timescale (seconds)
     plot : bool
         Whether to generate a plot of the FFT results
     save : bool
@@ -447,66 +593,36 @@ def memory_fft_phenom(t, h_list, plot=True, save=False, show=False, add_info_tit
     Returns:
     --------
     frequencies : array-like
-        Frequencies corresponding to the FFT result (for the last h in h_list)
+        Frequencies corresponding to the FFT result
     fft_h : array-like
-        FFT amplitude of the memory signal (for the last h in h_list)
+        FFT amplitude of the memory signal
     """
-    import numpy as np
-    import os
-    from scipy.fft import fft, fftfreq
-    import matplotlib.pyplot as plt
-
-    plt.figure(figsize=(8, 5))
-    results = []
-    colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
-    for i, h in enumerate(h_list):
-        # Filter finite values
-        valid_mask = np.isfinite(h) & np.isfinite(t)
-        t_valid = t[valid_mask]
-        h_valid = h[valid_mask]
-
-        # Interpolate onto a regular grid if needed
-        t_regular = np.linspace(t_valid.min(), t_valid.max(), len(t_valid))
-        h_interp = np.interp(t_regular, t_valid, h_valid)
-        t_seconds = t_regular
-        h_valid = h_interp
-        dt_mean = np.mean(np.diff(t_seconds))
-
-        N = len(h_valid)
-        fft_h = fft(h_valid)
-        frequencies = fftfreq(N, dt_mean)[:N//2]
-        fft_h = 2.0/N * np.abs(fft_h[:N//2])
-
-        pos_mask = frequencies > 0
-        frequencies_plot = frequencies[pos_mask]
-        fft_h_plot = fft_h[pos_mask]
-        results.append((frequencies_plot, fft_h_plot))
-
-        if plot:
-            color = colors[i % len(colors)]
-            plt.loglog(frequencies_plot, fft_h_plot, '-', linewidth=2, color=color, label=labels[i] if labels else None)
-
+    f = np.logspace(-6, 2, 10000)  # Frequencies from 1e-6 to 100 Hz with 10,000 points
+    fourier_h_square = delta_h**2/(8 * np.pi**4 * f**4 * tau**2) * (1-np.cos(2 * np.pi * f * tau))
     if plot:
-        plt.tick_params(top=True, right=True, axis='both', which='major', labelsize=12, direction='in', length=6, width=1.2)
+        plt.figure(figsize=(8, 8))
+        plt.loglog(f, np.sqrt(fourier_h_square), '-', linewidth=2)
         plt.xlabel('f [Hz]', fontsize=14)
-        plt.ylabel('Amplitude (strain)', fontsize=14)
+        plt.ylabel('Caracteristic strain', fontsize=14)
+        plt.xlim(1e-5, 1e2)
         if add_info_title:
-            plt.title('FFT memory signal\n' + f'{add_info_title}', fontsize=15)
+            plt.title('FFT memory signal from formula\n' + f'{add_info_title}', fontsize=15)
         else:
-            plt.title('FFT memory signal for ejecta', fontsize=15)
+            plt.title('FFT memory signal from formula', fontsize=15)
         plt.xlim(1e-6, 200)
-        plt.grid(True, alpha=0.3)
-        if len(h_list) > 1:
-            plt.legend()
         plt.tight_layout()
+    if LISA:
+        plt.loglog(f_lisa, np.sqrt(f_lisa*Sn_lisa), label='LISA', color='k', linestyle='-.')
     if save:
         os.makedirs(os.path.join(outdir, outdir_memory_fft), exist_ok=True)
         if add_info_title:
             add_info_save = '_' + add_info_title
-            plt.savefig(os.path.join(outdir, outdir_memory_fft, f"memory_fft_ejecta{add_info_save}.png"), dpi=150, bbox_inches='tight')
+            plt.savefig(os.path.join(outdir, outdir_memory_fft, f"memory_fft_formula{add_info_save}.png"), dpi=150, bbox_inches='tight')
         else:
-            plt.savefig(os.path.join(outdir, outdir_memory_fft, "memory_fft_ejecta.png"), dpi=150, bbox_inches='tight')
+            plt.savefig(os.path.join(outdir, outdir_memory_fft, "memory_fft_formula.png"), dpi=150, bbox_inches='tight')
     if show:
         plt.show()
-    else:
-        plt.close()
+    if return_fig:
+        return plt.gcf(), plt.gca()
+    
+    return f, np.sqrt(fourier_h_square)
