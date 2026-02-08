@@ -169,7 +169,8 @@ def phenom_memory_ejecta_components(
     r,
     model='exponential',
     plot = True,
-    delta_h_typical= 3.8e-25
+    delta_h_typical= True,
+    save = False
 ):
     """
     Plot linear memory from two ejecta components (dynamical + wind) with masks and custom parameters.
@@ -191,8 +192,8 @@ def phenom_memory_ejecta_components(
         Distance (meters)
     model : str
         'exponential' or 'tanh'
-    delta_h_typical : float
-        Typical value for reference line (default: 3.8e-25)
+    delta_h_typical : bool
+        Whether to plot a reference line for typical memory amplitude from Lopez et al. (default: True)
     """
 
     # Compute memory for both components (dynamical and wind) with masking 
@@ -210,8 +211,10 @@ def phenom_memory_ejecta_components(
         axes[0].set_yscale('linear')
         axes[0].tick_params(axis='both', labelsize=12)
         axes[0].axvline(end_dyn, color='#D7263D', linestyle='--', alpha=0.7)
-        axes[0].axhline(delta_h_typical, color='black', linestyle='dotted', linewidth=2, alpha=0.7, label=r'Typical $\Delta h$ (Lopez et al.)')
-        axes[0].text(end_dyn, delta_h_typical*1.05, r"$3.8 \times 10^{-25}$ (Lopez et.al)", color='black', fontsize=13, va='bottom', ha='right')
+        if delta_h_typical :
+            delta_h_typical=3.8e-25
+            axes[0].axhline(delta_h_typical, color='black', linestyle='dotted', linewidth=2, alpha=0.7, label=r'Typical $\Delta h$ (Lopez et al.)')
+            axes[0].text(end_dyn, delta_h_typical*1.05, r"$3.8 \times 10^{-25}$ (Lopez et.al)", color='black', fontsize=13, va='bottom', ha='right')
         # Wind ejecta plot
         axes[1].plot(t, h_wind, color='#1B998B', linewidth=2.5)
         axes[1].fill_between(t, h_wind, 0, color='#1B998B', alpha=0.2)
@@ -249,7 +252,8 @@ def phenom_memory_ejecta_components(
              rf"Phenomenological model for $\tau_{{dyn}} = {tau_dyn}$ ms and $\tau_{{wind}} = {tau_wind}$ ms", 
              fontsize=18, fontweight='bold', y=1.05)
         plt.tight_layout()
-        plt.savefig(outdir + f"linear_memory_ejecta_components_{model}_Mejdyn{M_ej_dyn:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_Mejwind{M_ej_wind:.2f}_vejwind{v_ej_wind/C_SI:.2f}_tau{tau_wind:.0e}.png")
+        if save:
+            plt.savefig(outdir + f"linear_memory_ejecta_components_{model}_Mejdyn{M_ej_dyn:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_Mejwind{M_ej_wind:.2f}_vejwind{v_ej_wind/C_SI:.2f}_tau{tau_wind:.0e}.png")
         plt.show()
 
 
@@ -315,7 +319,8 @@ def phenom_memory_ejecta_components_GRB(
     E_j, beta, theta, tau_GRB, start_GRB, end_GRB,
     model='exponential',
     plot=True,
-    delta_h_typical=3.8e-25
+    save=False,
+    delta_h_typical=True
 ):
     """
     Plot linear memory from two ejecta components (dynamical + wind) and GRB jet
@@ -347,12 +352,16 @@ def phenom_memory_ejecta_components_GRB(
         Start/end time (ms) for GRB memory
     model : str
         'exponential' or 'tanh'
-    delta_h_typical : float
-        Typical value for reference line (default: 3.8e-25)
+    delta_h_typical : bool
+        Whether to plot a reference line for typical memory amplitude from Lopez et al. (default: True)
     outdir : str
         Output directory for figures
+    plot : bool
+        Whether to plot the results
+    save : bool
+        Whether to save the figure (default: False)
     """
-    # Convert in SI units
+
 
     # Compute memory for both ejecta components
     h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, end_dyn, model=model)
@@ -389,7 +398,9 @@ def phenom_memory_ejecta_components_GRB(
                 ax.axvline(start_dyn, color='#D7263D', linestyle='--', alpha=0.7)
                 ax.axvline(end_dyn, color='#D7263D', linestyle='--', alpha=0.7)
                 ax.axhline(delta_h_typical, color='black', linestyle='dotted', linewidth=2, alpha=0.7)
-                ax.text(4.5, delta_h_typical*1.05, r"$3.8 \times 10^{-25}$ (Lopez et al.)", color='black', fontsize=13, va='bottom', ha='left')
+                if delta_h_typical :
+                    delta_h_typical=3.8e-25
+                    ax.text(4.5, delta_h_typical*1.05, r"$3.8 \times 10^{-25}$ (Lopez et al.)", color='black', fontsize=13, va='bottom', ha='left')
                 ax.set_xscale('linear')
                 ax.set_xlim(-1, end_dyn + 1)
             if i == 2:
@@ -418,7 +429,8 @@ def phenom_memory_ejecta_components_GRB(
             fontsize=18, fontweight='bold', y=1.05
         )
         plt.tight_layout()
-        plt.savefig(
+        if save:
+            plt.savefig(
             outdir + f"linear_memory_ejecta_components_GRB_{model}_Mejdyn{M_ej_dyn:.2f}_vejdyn{v_ej_dyn/C_SI:.2f}_tau{tau_dyn:.0e}_"
             f"Mejwind{M_ej_wind:.2f}_vejwind{v_ej_wind:.2f}_tau{tau_wind:.0e}_Ej{E_j:.2e}_beta{beta:.2f}_theta{theta:.2f}_tauGRB{tau_GRB:.0e}.png"
         )
@@ -432,7 +444,7 @@ def phenom_memory_total_plot(
     M_ej_wind, v_ej_wind, tau_wind, start_wind, end_wind,
     E_j, beta, theta, tau_GRB, start_GRB, end_GRB,
     model='exponential',
-    delta_h_typical=3.8e-25,
+    save=False
 
 ):
     """
@@ -500,7 +512,8 @@ def phenom_memory_total_plot(
         fontsize=15, fontweight='bold', y=0.98
     )
     plt.tight_layout()
-    plt.savefig(outdir + f"total_memory_{model}_tau{tau_dyn:.0e}_{tau_wind:.0e}_{tau_GRB:.0e}.png", 
+    if save:
+        plt.savefig(outdir + f"total_memory_{model}_tau{tau_dyn:.0e}_{tau_wind:.0e}_{tau_GRB:.0e}.png", 
                 dpi=300, bbox_inches='tight')
     plt.show()
     return h_tot
@@ -535,8 +548,8 @@ def memory_fft_phenom(
         pos_mask = frequencies > 0
         frequencies_plot = frequencies[pos_mask]
         fft_h_plot = 2.0/N * np.abs(fft_h[pos_mask])
-
-        results.append((frequencies_plot, fft_h_plot))
+        # Plot characteristic strain (h_c = 2f|h(f)|) to compare with sensitivity curves
+        results.append((frequencies_plot, 2*frequencies_plot*fft_h_plot))
 
         if plot:
             color = colors[i % len(colors)]
@@ -545,7 +558,7 @@ def memory_fft_phenom(
     if plot:
         plt.tick_params(top=True, right=True, axis='both', which='major', labelsize=12, direction='in', length=6, width=1.2)
         plt.xlabel('f [Hz]', fontsize=14)
-        plt.ylabel('Caracteristic strain', fontsize=14)
+        plt.ylabel(r'Caracteristic strain $h_c$', fontsize=14)
         if LISA:
             plt.loglog(f_lisa, np.sqrt(f_lisa*Sn_lisa), label='LISA', color='k', linestyle='-.')
         if add_info_title:
@@ -571,7 +584,8 @@ def memory_fft_phenom(
         return results
 def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info_title=None, outdir="./figures/", outdir_memory_fft="memory_fft", return_fig=False, LISA=False):
     """
-    Computes and plots the FFT of a memory signal (t and h provided) based on formula (4.2) provided by https://arxiv.org/pdf/gr-qc/0405067 .
+    Computes and plots the FFT of a memory signal (t and h provided) based on formula (4.2) provided by https://arxiv.org/pdf/gr-qc/0405067
+    The characteristic strain is rather plot than the FFT amplitude, to be able to compare with sensitivity curves
     Parameters:
     -----------
     delta_h : float
@@ -599,9 +613,10 @@ def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info
     """
     f = np.logspace(-6, 2, 10000)  # Frequencies from 1e-6 to 100 Hz with 10,000 points
     fourier_h_square = delta_h**2/(8 * np.pi**4 * f**4 * tau**2) * (1-np.cos(2 * np.pi * f * tau))
+    caracteristic_strain = 2*f* np.sqrt(fourier_h_square)
     if plot:
         plt.figure(figsize=(8, 8))
-        plt.loglog(f, np.sqrt(fourier_h_square), '-', linewidth=2)
+        plt.loglog(f,caracteristic_strain , '-', linewidth=2)
         plt.xlabel('f [Hz]', fontsize=14)
         plt.ylabel('Caracteristic strain', fontsize=14)
         plt.xlim(1e-5, 1e2)
