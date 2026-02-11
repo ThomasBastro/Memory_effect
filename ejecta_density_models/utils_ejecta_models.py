@@ -47,7 +47,6 @@ def rho_profile_model1(r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol=
     if v_pm_max > v_d_min:
         raise ValueError("In this model, v_pm_max must be less than v_d_min !")
     # Dynamical ejecta
-    print('v :', v)
     if v_d_min <= v < 0.4:
         rho_dyn = eta_theta * r**(-4) * t**(-3)
     elif 0.4 <= v < v_max:
@@ -271,6 +270,58 @@ def XZ_pm(Ye_range):
     else:
         return 0.0
 
+def compute_ejecta_mass(
+    rho_profile_func,
+    t,
+    theta,
+    v_pm_min, v_pm_max, v_d_min, v_max,
+    f_d_pol=0.01,
+    r_min=1e7, r_max=1e10, n_r=200
+):
+    """
+    Calcule la masse totale de l'éjecta à un angle theta donné et à un instant t,
+    en intégrant rho(r, t, theta) * dV sur r.
+
+    Paramètres :
+    ------------
+    rho_profile_func : fonction
+        Fonction de profil de densité (ex: rho_profile_model1 ou model2)
+    t : float
+        Temps (s)
+    theta : float
+        Angle polaire (rad)
+    v_pm_min, v_pm_max, v_d_min, v_max : float
+        Paramètres de vitesses (en unités de c)
+    f_d_pol : float
+        Contraste polaire
+    r_min, r_max : float
+        Bornes d'intégration en rayon (m)
+    n_r : int
+        Nombre de points pour l'intégration radiale
+
+    Retour :
+    --------
+    mass_theta : float
+        Masse totale de l'éjecta à cet angle (en g)
+    """
+    r_grid = np.linspace(r_min, r_max, n_r)
+    dr = np.gradient(r_grid)
+    mass_theta_dyn = 0.0
+    mass_theta_pm = 0.0
+    mass_theta = 0.0
+    for ir, r in enumerate(r_grid):
+        rho_dyn, rho_pm, rho_tot = rho_profile_func(
+            r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol
+        )
+        dV = 2 * np.pi * r**2 * np.sin(theta) * dr[ir]  # dV sphérique, symétrie axiale
+        mass_theta_dyn += rho_dyn * dV
+        mass_theta_pm += rho_pm * dV
+        mass_theta += rho_tot * dV
+        
+    return mass_theta_dyn, mass_theta_pm, mass_theta
+
+
+
 def compute_memory_from_density_profile(
     rho_profile_func,
     t_arr,
@@ -388,3 +439,107 @@ def plot_memory_vs_theta(
     plt.tight_layout()
     plt.show()
     return memory_map
+
+#--- GRB + afterglow modesl from https://arxiv.org/pdf/2301.12590
+
+def memory_initial_acceleration(Ej, theta_ej, phi_ej, d, beta=0.99):
+    """
+    Initial memory from the jet acceleration phase (Eq. 11) : h_in
+    The jets are assumed to be instantaneously accelerated.
+    Paramètres:
+    -----------
+    Ej : float
+        Total kinetic energy of the jet [erg]
+    theta_ej : float
+        Viewing angle (angle between jet axis and line of sight) [rad]
+    phi_ej : float
+        Azimuthal angle of the jet in the plane of the sky [rad]
+    d : float
+        Distance to the source [pc]
+    beta : float
+        Normalized velocity of the jet (v/c), typically close to 1 for (ultra)relativistic jets
+    
+    Retourne:
+    ---------
+    h_in : float
+        Amplitude GW mémoire de la phase initiale
+    """
+ 
+    # Angular factor
+    angular_factor = beta**2 * np.sin(theta_ej)**2 / (1 - beta* np.cos(theta_ej))  / np.cos(2 * phi_ej)
+    # Convert energy from erg to Joules
+    Ej_J = Ej * 1e-7
+    # Convert distance from parsec to meters
+    d_m = d * PC_SI
+    # Calculate the initial memory amplitude
+    h_in = (2 * G_SI / c**4) * (Ej_J / d_m) * angular_factor
+    return h_in
+
+
+def memory_afterglow_injection(Pin, T_end, theta_ej, phi_ej, d, beta=0.99):
+    """
+    Additional memory from the afterglow injection phase (Eq. 12) : h_m 
+    Arise from the continuous energy injection into the external medium by the jet after the initial acceleration phase.
+    The GW signals in GRB afterglows originate from the shock-accelerated ISM and the synchrotrons emission.
+    Parameters:
+-----------
+    Pin : float
+        Power of the energy injection [erg/s] ~ 10^48- 10^50 erg/s
+    T_end : float
+        Duration of the energy injection phase [s] ~ 10^2 - 10^3 s
+    theta_ej : float
+        Viewing angle (angle between jet axis and line of sight) [rad]
+    phi_ej : float
+        Azimuthal angle of the jet in the plane of the sky [rad]
+    d : float
+        Distance to the source [pc]
+    beta : float
+        Normalized velocity of the jet (v/c), typically close to 1 for (ultra)relativistic jets
+    """
+    # Angular factor (same as initial memory)
+    angular_factor = beta**2 * np.sin(theta_ej)**2 / (1 - beta* np.cos(theta_ej))  / np.cos(2 * phi_ej)
+    # Convert power from erg/s to W
+    Pin *=  1e-7
+    # Convert Pin to total injected energy over T_end
+    E_injected_J = Pin * T_end
+    # Convert distance from parsec to meters
+    d_m = d * PC_SI
+    # Calculate the additional memory amplitude from the afterglow injection
+    h_m = (2 * G_SI / c**4) * (E_injected_J / d_m) * angular_factor
+    
+    return h_m
+
+
+def memory_total_waveform(t_obs, h_in, h_m, t_m):
+    """
+    Forme d'onde complète de la mémoire GW (Eq. 17)
+    
+    Paramètres:
+    -----------
+    t_obs : array
+        Temps d'observation [s]
+    h_in : float
+        Mémoire de la phase initiale
+    h_m : float
+        Mémoire additionnelle due à l'injection
+    t_m : float
+        Temps caractéristique = T_end + R_end*(1-cos(theta_ej))*(1+z)/c
+    
+    Retourne:
+    ---------
+    h_total : array
+        Amplitude GW mémoire totale
+    """
+    h_total = np.zeros_like(t_obs)
+    
+    # Phase de montée linéaire
+    mask_rise = (t_obs > 0) & (t_obs <= t_m)
+    h_total[mask_rise] = h_in + h_m * (t_obs[mask_rise] / t_m)
+    
+    # Phase plateau (mémoire permanente)
+    mask_plateau = t_obs > t_m
+    h_total[mask_plateau] = h_in + h_m
+    
+    return h_total  
+    
+  
