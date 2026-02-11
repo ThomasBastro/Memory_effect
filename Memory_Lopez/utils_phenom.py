@@ -263,18 +263,32 @@ def phenom_memory_GRB(
     Compute and plot the linear memory from a GRB jet with masking.
     The energy is in erg , velocity in units of c, distance in parsecs, time in seconds, and tau in seconds.
 
-    Paramètres :
-    - t : array, temps (ms)
-    - E_j : énergie du jet (donné en erg, converti en Joules dans la fonction)
-    - beta : vitesse du jet (en unités de c)
-    - theta : angle du jet (radians)
-    - r : distance à la source (mètres)
-    - tau_GRB : temps caractéristique (ms)
-    - start_GRB, end_GRB : début/fin de l'émission mémoire (ms)
-    - model : 'exponential' ou 'tanh'
-    - plot : bool, si True, affiche le signal mémoire GRB
-    Retour :
-    - h_GRB : array, signal mémoire masqué
+    Parameters   
+    ----------
+    t : array
+        Time array (s)
+    E_j : float
+        Energy of the GRB jet (erg)
+    beta : float
+        Velocity of the jet (in units of c)
+    theta : float
+        Angle of the jet (radians)
+    r : float
+        Distance to source (parsecs)
+    tau_GRB : float
+        Characteristic timescale for GRB memory (s)
+    start_GRB : float
+        Start time of GRB memory active phase (s)
+    end_GRB : float
+        End time of GRB memory active phase (s)
+    model : str
+        Model type for GRB memory evolution ('exponential' or 'tanh')
+    plot : bool
+        Whether to plot the results
+    Returns
+    -------
+    h_GRB : array
+        Memory strain array for the GRB jet with masking applied
     """
     E_j = E_j * 1e-7  # Convert energy from erg to Joules
     r = r * PC_SI  # Convert distance from parsecs to meters
