@@ -596,6 +596,7 @@ def memory_fft_phenom(
         return plt.gcf(), plt.gca()
     if return_fft:
         return results
+
 def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info_title=None, outdir="./figures/", outdir_memory_fft="memory_fft", return_fig=False, LISA=False):
     """
     Computes and plots the FFT of a memory signal (t and h provided) based on formula (4.2) provided by https://arxiv.org/pdf/gr-qc/0405067
@@ -625,14 +626,14 @@ def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info
     fft_h : array-like
         FFT amplitude of the memory signal
     """
-    f = np.logspace(-6, 2, 10000)  # Frequencies from 1e-6 to 100 Hz with 10,000 points
-    fourier_h_square = delta_h**2/(8 * np.pi**4 * f**4 * tau**2) * (1-np.cos(2 * np.pi * f * tau))
+    f = np.logspace(-6, 4, int(1e5))  # Frequencies from 1e-6 to 10000 Hz with 10,000 points
+    fourier_h_square = delta_h**2 * (1-np.cos(2 * np.pi * f * tau)) /(8 * np.pi**4 * f**4 * tau**2) 
     caracteristic_strain = 2*f* np.sqrt(fourier_h_square)
     if plot:
         plt.figure(figsize=(8, 8))
         plt.loglog(f,caracteristic_strain , '-', linewidth=2)
         plt.xlabel('f [Hz]', fontsize=14)
-        plt.ylabel('Caracteristic strain', fontsize=14)
+        plt.ylabel(r'Caracteristic strain $h_c$[f]', fontsize=14)
         plt.xlim(1e-5, 1e2)
         if add_info_title:
             plt.title('FFT memory signal from formula\n' + f'{add_info_title}', fontsize=15)
@@ -654,7 +655,7 @@ def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info
     if return_fig:
         return plt.gcf(), plt.gca()
     
-    return f, np.sqrt(fourier_h_square)
+    return f, caracteristic_strain
 
 #--- GRB + afterglow modesl from https://arxiv.org/pdf/2301.12590
 
@@ -702,7 +703,7 @@ def memory_afterglow_injection(Pin, T_end, theta_ej, theta_j, d, beta=0.99):
     Pin : float
         Power of the energy injection [erg/s] ~ 10^48- 10^50 erg/s
     T_end : float
-        Duration of the energy injection phase [s] ~ 10^2 - 10^3 s
+        Duration of the energy injection phase [s] ~ 10^2 - 10^3 s =? Duration of the burst in the observer frame
     theta_ej : float
         Viewing angle (angle between jet axis and line of sight) [rad]
     theta_j : float
@@ -765,7 +766,7 @@ def new_fft(h_in, h_m, t_end_injection, theta_ej):
     """
     Compute the FFT as mentionned in (17)
     """
-    f = np.logspace(-8, 2, int(1e5))  # Frequencies from 1e-6 to 100 Hz with 10,000 points
+    f = np.logspace(-6, 4, int(1e5))  # Frequencies from 1e-6 to 10000 Hz with 10,000 points
     t_m = t_end_injection + (0.01 * PC_SI) * (1-np.cos(theta_ej))/ C_SI
     
     a = h_m/(4*np.pi**2 * f**2 * t_m)
