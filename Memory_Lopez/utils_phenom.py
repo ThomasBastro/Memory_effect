@@ -728,7 +728,7 @@ def memory_afterglow_injection(Pin, T_end, theta_ej, theta_j, d, beta=0.99):
     return h_m
 
 
-def memory_total_waveform(t_obs, h_in, h_m, t_end_injection, theta_ej):
+def memory_total_waveform(t_obs, h_in, h_m, t_end_injection, theta_ej, radius =0.01):
     """
     Total memory waveform combining the initial acceleration and afterglow injection phases
     Parameters:
@@ -743,6 +743,8 @@ def memory_total_waveform(t_obs, h_in, h_m, t_end_injection, theta_ej):
         Characteristic timescale for the afterglow injection phase (duration over which h_m is accumulated) [s]
     theta_ej : float
         Viewing angle (angle between jet axis and line of sight) [rad]
+    radius : float [pc]
+        Characteristic radius for the afterglow shock (in parsecs) used to estimate the timescale t_m for the memory to reach its maximum value. Default is 0.01 [pc]
         
     """
     h_total = np.zeros_like(t_obs) # Zero array to hold the total memory signal before the injection starts
@@ -750,7 +752,7 @@ def memory_total_waveform(t_obs, h_in, h_m, t_end_injection, theta_ej):
     # In this model, we have to compute t_m the timescale for the memory to reach its maximum value (h_in + h_m).
     # Normally it is defined as the end time of the energy injection phase + (distance of the jet to the source at T_end) / c 
     # Here, for simplicity, we assume that R_end ~0.01 pc - typicall value
-    t_m = t_end_injection + ( (0.01 * PC_SI) * (1-np.cos(theta_ej)) )/ C_SI # Neglect redshift (otherwise add a factor (1+z) in the numerator)
+    t_m = t_end_injection + ( (radius * PC_SI) * (1-np.cos(theta_ej)) )/ C_SI # Neglect redshift (otherwise add a factor (1+z) in the numerator)
  
     # Mask for the rising phase of the memory (from 0 to t_m)
     mask_rise = (t_obs > 0) & (t_obs <= t_m)
@@ -762,12 +764,25 @@ def memory_total_waveform(t_obs, h_in, h_m, t_end_injection, theta_ej):
     
     return h_total, t_m
 
-def new_fft(h_in, h_m, t_end_injection, theta_ej):
+def new_fft(h_in, h_m, t_end_injection, theta_ej, radius=0.01):
     """
     Compute the FFT as mentionned in (17)
+    
+    Parameters:
+    -----------
+    h_in : float
+        Initial memory amplitude from the jet acceleration phase
+    h_m : float
+        Additional memory amplitude from the afterglow injection phase
+    t_end_injection : float
+        Characteristic timescale for the afterglow injection phase (duration over which h_m is accumulated) [s]
+    theta_ej : float
+        Viewing angle (angle between jet axis and line of sight) [rad]
+    radius : float [pc]
+        Characteristic radius for the afterglow shock (in parsecs) used to estimate the timescale t_m for the memory to reach its maximum value. Default is 0.01 [pc]
     """
     f = np.logspace(-6, 4, int(1e5))  # Frequencies from 1e-6 to 10000 Hz with 10,000 points
-    t_m = t_end_injection + (0.01 * PC_SI) * (1-np.cos(theta_ej))/ C_SI
+    t_m = t_end_injection + (radius* PC_SI) * (1-np.cos(theta_ej))/ C_SI
     
     a = h_m/(4*np.pi**2 * f**2 * t_m)
     b = h_in/(2*np.pi* f)
