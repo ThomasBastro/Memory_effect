@@ -43,7 +43,7 @@ def rho_profile_model1(r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol=
     v = r / t / c
     eta_theta = eta(theta, f_d_pol)
     t_day = t / 86400  # t in days
-    rho_floor = 1e-20 * t_day**-3  
+    rho_floor = 1e-17 * t_day**-3  # 1e-20g/cm^3 = 1e-17 kg/m^3
     if v_pm_max > v_d_min:
         raise ValueError("In this model, v_pm_max must be less than v_d_min !")
     # Dynamical ejecta
@@ -93,7 +93,7 @@ def rho_profile_model2(r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol=
         v = r / t / c
         eta_theta = eta(theta, f_d_pol)
         t_day = t / 86400
-        rho_floor = 1e-20 * t_day**-3  # g/cm^3
+        rho_floor = 1e-17 * t_day**-3  # 1e-20g/cm^3 = 1e-17 kg/m^3 
 
         # Dynamical ejecta
         if v_d_min <= v < 0.4:
@@ -275,8 +275,7 @@ def compute_ejecta_mass(
     t,
     theta,
     v_pm_min, v_pm_max, v_d_min, v_max,
-    f_d_pol=0.01,
-    r_min=1e7, r_max=1e10, n_r=200
+    f_d_pol=0.01, n_r=200
 ):
     """
     Calcule la masse totale de l'éjecta à un angle theta donné et à un instant t,
@@ -294,8 +293,8 @@ def compute_ejecta_mass(
         Paramètres de vitesses (en unités de c)
     f_d_pol : float
         Contraste polaire
-    r_min, r_max : float
-        Bornes d'intégration en rayon (m)
+    v_max : float
+        Vitesse maximale de l'éjecta (en unités de c) ~ 0.9 c
     n_r : int
         Nombre de points pour l'intégration radiale
 
@@ -304,22 +303,36 @@ def compute_ejecta_mass(
     mass_theta : float
         Masse totale de l'éjecta à cet angle (en g)
     """
+    r_max = v_max * C_SI * t
+    r_min = 0.1 * C_SI * t  # pour éviter de commencer à r=0 où la densité peut diverger
     r_grid = np.linspace(r_min, r_max, n_r)
     dr = np.gradient(r_grid)
     mass_theta_dyn = 0.0
     mass_theta_pm = 0.0
     mass_theta = 0.0
-    for ir, r in enumerate(r_grid):
+
+    mass_dyn_arr = []
+    mass_pm_arr = []
+    mass_tot_arr = []
+    for idx, r in enumerate(r_grid):
         rho_dyn, rho_pm, rho_tot = rho_profile_func(
             r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol
         )
-        dV = 2 * np.pi * r**2 * np.sin(theta) * dr[ir]  # dV sphérique, symétrie axiale
+        dV = 2 * np.pi * r**2 * np.sin(theta) * dr[idx]  # dV sphérique
         mass_theta_dyn += rho_dyn * dV
         mass_theta_pm += rho_pm * dV
         mass_theta += rho_tot * dV
-        
-    return mass_theta_dyn, mass_theta_pm, mass_theta
+        # Store intermediate values for plotting & transform r to velocity in units of c
+        mass_dyn_arr.append((r / (t * c), mass_theta_dyn))
+        mass_pm_arr.append((r / (t * c), mass_theta_pm))
+        mass_tot_arr.append((r / (t * c),mass_theta))
 
+    # Convert lists to numpy arrays for easier handling
+    mass_dyn_arr = np.array(mass_dyn_arr)
+    mass_pm_arr = np.array(mass_pm_arr)
+    mass_tot_arr = np.array(mass_tot_arr)
+
+    return mass_dyn_arr, mass_pm_arr, mass_tot_arr
 
 
 def compute_memory_from_density_profile(
