@@ -21,7 +21,7 @@ def eta(theta, f_d_pol=f_d_pol):
     """Angular density profile for dynamical ejecta"""
     return (1 - Theta(theta)) * f_d_pol + Theta(theta)
 
-# Modified density profile function
+
 def rho_profile_model1(r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol=0.01):
     """
     Compute the density profile for a simple ejecta model with dynamical and post-merger components
@@ -40,7 +40,7 @@ def rho_profile_model1(r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol=
         rho_pm: density of post-merger ejecta
         rho_tot: total density (sum of both)
     """
-    v = r / t / c
+    v = r / (t*C_SI)  # velocity in units of c
     eta_theta = eta(theta, f_d_pol)
     t_day = t / 86400  # t in days
     rho_floor = 1e-17 * t_day**-3  # 1e-20g/cm^3 = 1e-17 kg/m^3
@@ -50,7 +50,10 @@ def rho_profile_model1(r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol=
     if v_d_min <= v < 0.4:
         rho_dyn = eta_theta * r**(-4) * t**(-3)
     elif 0.4 <= v < v_max:
-        rho_dyn = eta_theta * r**(-8) * t**(-3)
+        # Compute the normalization factor at the transition velocity (v = 0.4 c)
+        r_transition = 0.4 * t * C_SI
+        norm = r_transition**(-4) * t**(-3) / (r_transition**(-8) * t**(-3))
+        rho_dyn = norm * eta_theta * r**(-8) * t**(-3)
     else:
         rho_dyn = 0.0
 
@@ -99,7 +102,9 @@ def rho_profile_model2(r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol=
         if v_d_min <= v < 0.4:
             rho_dyn = eta_theta * r**-4 * t**-3
         elif 0.4 <= v < v_max:
-            rho_dyn = eta_theta * r**-8 * t**-3
+            r_transition = 0.4 * t * c
+            norm =  r_transition**-4 * t**-3 / (r_transition**-8 * t**-3)
+            rho_dyn = norm * eta_theta * r**-8 * t**-3
         else:
             rho_dyn = 0.0
 
@@ -254,22 +259,6 @@ def make_ejecta_density_gif(
     HTML(ani.to_jshtml())
     return gif_path, ani
 
-def XZ_dyn(theta, XZ):
-    """Mass fraction of element Z for dynamical ejecta, angular dependence."""
-    return (1 - Theta(theta)) * XZ + Theta(theta) * XZ
-
-def XZ_pm(Ye_range):
-    """Mass fraction for post-merger ejecta, fixed by Ye range."""
-    # Example values for lanthanides
-    if Ye_range == "0.3-0.4":
-        return 1e-3
-    elif Ye_range == "0.2-0.4":
-        return 0.025
-    elif Ye_range == "0.1-0.3":
-        return 0.14
-    else:
-        return 0.0
-
 def compute_ejecta_mass(
     rho_profile_func,
     t,
@@ -301,7 +290,7 @@ def compute_ejecta_mass(
     Retour :
     --------
     mass_theta : float
-        Masse totale de l'éjecta à cet angle (en g)
+        Masse totale de l'éjecta à cet angle (en kg)
     """
     r_max = v_max * C_SI * t
     r_min = 0.1 * C_SI * t  # pour éviter de commencer à r=0 où la densité peut diverger
@@ -337,11 +326,9 @@ def compute_ejecta_mass(
 
 def compute_memory_from_density_profile(
     rho_profile_func,
-    t_arr,
+    t,
     theta,
     v_pm_min, v_pm_max, v_d_min, v_max,
-    f_d_pol=0.01,
-    r_min=1e7, r_max=1e10, n_r=200,
     distance_pc=40e6,
     tau=1e-3,
     model='exponential'
@@ -353,8 +340,8 @@ def compute_memory_from_density_profile(
     ------------
     rho_profile_func : fonction
         Fonction de profil de densité (ex: rho_profile_model1 ou model2)
-    t_arr : array
-        Tableau des temps (s)
+    t : float
+        Time at which to compute the memory (s) - time at which the ejecta has expanded and we want to evaluate the memory
     theta : float
         Angle polaire (rad)
     v_pm_min, v_pm_max, v_d_min, v_max : float
@@ -376,54 +363,45 @@ def compute_memory_from_density_profile(
     h_t : array (len(t_arr),)
         Mémoire linéaire pour chaque temps à l'angle donné
     """
-    r_grid = np.linspace(r_min, r_max, n_r)
-    dr = np.gradient(r_grid)
+    r_min = 0.1 * C_SI * t
+    r_max = v_max * C_SI * t
     distance_m = distance_pc * PC_SI
 
-    h_t = np.zeros(len(t_arr))
+    # For each time step, compute the mass of the ejecta at this angle 
+    m_ejecta_tot, _, _ = compute_ejecta_mass(
+        rho_profile_func, t, theta,
+        v_pm_min, v_pm_max, v_d_min, v_max,
+    )
+    # Masse totale à cet angle
+    M_ej = m_ejecta_tot[-1, 1]  # Take total mass in this case - should be modified to give dyn, wind, tot
+    print(M_ej)
+    # ---
+    # Caracteristic velocity based on the maximum radius reached at the last time step (correct ?)
+    # Should take the mean ?
+    v_char = r_max / t / C_SI # in units of c
+    # ---
+    # Angular factor to account for the TT gauge analytically 
+    angular_fact = np.sin(theta)**2 / (1 - v_char * np.cos(theta)) # Add a factor beta = v/c like this?
+    # Linear memory amplitude
+    delta_h_theta = 2 * G_SI / (C_SI**4 * distance_m) * M_ej * (v_char * C_SI)**2 * angular_fact
+    print(f"delta_h_theta at t={t:.3f} s and theta={theta:.3f} rad: {delta_h_theta:.3e}")
+    # As we computed delta_h_theta, we can now apply the time evolution model to get h(t) for each time step
+    t_arr = np.logspace(-4, 2, 5000)  # Time array from 0.1 ms 
+    if model == 'exponential':
+        h_t = delta_h_theta / (1 + np.exp(-t_arr / tau))
+    elif model == 'tanh':
+        h_t = delta_h_theta * 0.5 * np.tanh(t_arr / tau) + delta_h_theta * 0.5
+    else:
+        raise ValueError("model must be 'exponential' or 'tanh'")
 
-    for it, t in enumerate(t_arr):
-        # Intégration de la densité sur r pour obtenir la masse éjectée à cet angle et à cet instant
-        mass_theta = 0.0
-        v_theta = 0.0
-        mass_tot = 0.0
-        for ir, r in enumerate(r_grid):
-            rho_dyn, rho_pm, rho_tot = rho_profile_func(
-                r, t, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol
-            )
-            dV = 2 * np.pi * r**2 * np.sin(theta) * dr[ir]  # dV sphérique, symétrie axiale
-            mass_theta += rho_tot * dV
-            v_loc = r / (t * c) if t > 0 else 0
-            v_theta += v_loc * rho_tot * dV
-            mass_tot += rho_tot * dV
-        # Masse totale à cet angle
-        M_ej_theta = mass_theta  # en g
-        if M_ej_theta == 0:
-            h_t[it] = 0
-            continue
-        # Vitesse caractéristique
-        v_char = v_theta / mass_tot if mass_tot > 0 else 0
-        # Conversion masse en kg
-        M_ej_theta_kg = M_ej_theta * 1e-3
-        # Mémoire linéaire à cet angle (amplitude finale)
-        delta_h_theta = 2 * G_SI / (C_SI**4 * distance_m) * M_ej_theta_kg * (v_char * c)**2
-        # Modèle phénoménologique pour la montée
-        if model == 'exponential':
-            h_t[it] = delta_h_theta / (1 + np.exp(-t / tau))
-        elif model == 'tanh':
-            h_t[it] = delta_h_theta * 0.5 * np.tanh(t / tau) + delta_h_theta * 0.5
-        else:
-            raise ValueError("model must be 'exponential' or 'tanh'")
-
-    return h_t
+    return t_arr, h_t
 
 def plot_memory_vs_theta(
     rho_profile_func,
     t_arr,
     theta_arr,
     v_pm_min, v_pm_max, v_d_min, v_max,
-    f_d_pol=0.01,
-    r_min=1e7, r_max=1e10, n_r=2000,
+    f_d_pol=0.01, n_r=2000,
     distance_pc=40e6,
     tau=1e-3,
     model='exponential'
@@ -437,21 +415,19 @@ def plot_memory_vs_theta(
         h_t = compute_memory_from_density_profile(
             rho_profile_func, t_arr, theta,
             v_pm_min, v_pm_max, v_d_min, v_max,
-            f_d_pol, r_min, r_max, n_r, distance_pc, tau, model
+            f_d_pol, n_r, distance_pc, tau, model
         )
-        memory_map.append(h_t)
-    memory_map = np.array(memory_map)  # shape (len(theta_arr), len(t_arr))
-
-    plt.figure(figsize=(8, 5))
-    extent = [t_arr[0], t_arr[-1], theta_arr[0], theta_arr[-1]]
-    plt.imshow(memory_map, aspect='auto', origin='lower', extent=extent, cmap='viridis')
-    plt.colorbar(label='Memory $h(t,\\theta)$')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Theta (rad)')
-    plt.title('Phenomenological memory vs time and angle')
-    plt.tight_layout()
+        memory_map.append(h_t[-1]) # Final memory at the last time step
+    memory_map = np.array(memory_map)
+    plt.figure(figsize=(8, 6))
+    plt.plot(theta_arr, memory_map, marker='o', color='crimson')
+    plt.yscale('log')
+    plt.xlabel(r'Viewing angle $\theta$ [rad]')
+    plt.ylabel(r'Final linear memory $h$')
+    plt.title('Final GW linear memory vs viewing angle')
+    plt.minorticks_on()
     plt.show()
-    return memory_map
+    
 
 #--- GRB + afterglow modesl from https://arxiv.org/pdf/2301.12590
 
