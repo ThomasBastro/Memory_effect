@@ -12,9 +12,17 @@ Sn_lisa = lisa.Sn(f_lisa)
 outdir = "./figures/"
 
 def model_exponential(t, delta_h, tau):
-    return delta_h / (1 + np.exp(-t / tau))
+    return (2*delta_h * (1/(1 + np.exp(-t / tau))-0.5))
 def model_tanh(t, delta_h, tau):
     return delta_h * 0.5 * np.tanh(t/tau) + delta_h * 0.5
+
+def model_linear(t, delta_h, tau, start_s=0.):
+    # if t < 0, h = 0, if t > tau, h = delta_h, if 0 < t < tau, h = delta_h * t/tau
+    h = np.zeros_like(t)
+    h[t < start_s] = 0.
+    h[(t >= start_s) & (t < start_s + tau)] = delta_h * (t[(t >= start_s) & (t < start_s + tau)] - start_s) / tau
+    h[t >= start_s + tau] = delta_h
+    return h
 
 def delta_h_ejecta(M_ej, v_ej, r):
     """
@@ -37,7 +45,7 @@ def delta_h_ejecta(M_ej, v_ej, r):
     r = r * PC_SI  # Convert distance from parsecs to meters
     M_ej = M_ej * MSUN_SI  # Convert mass from solar masses to kg
     v_ej = v_ej * C_SI  # Convert velocity from c to m/s
-    delta_h = 2 * G_SI / (C_SI**4 * r) * M_ej * v_ej**2
+    delta_h = 2 * G_SI / (C_SI**4 * r) * M_ej * v_ej**2 # <-- SHOULD ADD AN ANGUL FACTOR DEPENDING ON THE EJECTA GEOMETRY TO ACCOUNT FOR THE TT GAUGE ?
     return delta_h
 def delta_h_GRB(E_j, beta, theta, r):
     """
@@ -113,9 +121,9 @@ def phenom_memory_models(tau, M_ej_dyn, v_ej_dyn, r, t, model, plot):
         plt.show()
     return t, h
 
-def linear_memory_ejecta_masked(t, M_ej, v_ej, tau, r, start_ms, end_ms, model='exponential'):
+def linear_memory_ejecta_masked(t, M_ej, v_ej, tau, r, start_s=0., model='exponential'):
     """
-    Compute linear memory from ejecta with masking for active and after phases.
+    Compute the linear memory from ejecta with a mask to only include the contribution after a certain start time.
     The mass is in unit of solar mass, velocity in unit of c, distance in parsecs, time in seconds, and tau in seconds.
     Parameters:
     -----------
@@ -123,21 +131,20 @@ def linear_memory_ejecta_masked(t, M_ej, v_ej, tau, r, start_ms, end_ms, model='
         Time array (s)
     M_ej : float
         Ejecta mass in solar mass
-    v_ej : float        Ejecta velocity (m/s)
+    v_ej : float   
+        Ejecta velocity (in units of c)
     tau : float
         Characteristic timescale (s)
     r : float
         Distance to source (parsecs)
-    start_ms : float
-        Start time of active phase (ms)
-    end_ms : float
-        End time of active phase (ms)
+    start_s : float
+        Start time for the memory contribution (s)
     model : str
-        Model type ('exponential' or 'tanh')
+        Model type for the memory growth ('exponential' or 'tanh')
     Returns:
     --------    
-    h_masked : array
-        Memory strain array with masking applied
+    h_t : array
+        Memory strain array centered around the start time, with the memory growth starting at start_s and evolving according to the chosen model.
     """
     # Convert parameters to SI units
     r = r * PC_SI  # Convert distance from parsecs to meters
@@ -146,19 +153,39 @@ def linear_memory_ejecta_masked(t, M_ej, v_ej, tau, r, start_ms, end_ms, model='
     
     delta_h = 2 * G_SI / (C_SI**4 * r) * M_ej * v_ej**2
     if model == 'exponential':
-        h_t = model_exponential(t, delta_h, tau)
+        h_t = model_exponential(t-start_s, delta_h, tau)
     elif model == 'tanh':
-        h_t = model_tanh(t, delta_h, tau)
+        h_t = model_tanh(t-start_s, delta_h, tau)
     else:
         raise ValueError("Model must be 'exponential' or 'tanh'")
-    h_masked = np.zeros_like(t)
-    mask_active = (t >= start_ms) & (t <= end_ms)
-    mask_after = t > end_ms
-    h_masked[mask_active] = h_t[mask_active]
-    if np.any(mask_active):
-        last_val = h_t[mask_active][-1]
-        h_masked[mask_after] = last_val
-    return h_masked
+    # lask for values of t before start_s
+    h_t[t < start_s] = 0.0
+    
+    return h_t
+
+def fft_exp_model(delta_h, tau):
+    """
+    Compute the Fourier transform of the exponential memory model.
+    The time is in seconds, delta_h is the memory amplitude, and tau is the characteristic timescale in seconds.
+
+    Parameters:
+    -----------
+    t : array
+        Time array (s)
+    delta_h : float
+        Memory amplitude (strain)
+    tau : float
+        Characteristic timescale (s)
+    Returns:
+    --------
+    f : array
+        Frequency array (Hz)
+    H_f : array
+        Fourier transform of the memory strain (complex values)
+    """
+    f = np.logspace(-6, 4, int(1e5))  # Frequencies from 1e-6 to 10000 Hz with 10,000 points
+    h_f =  delta_h *np.pi * tau /(2* 1j*np.sinh( np.pi * f * tau)) # Add a factor of 1/2 to have the same ft[0] as delta_h
+    return f, np.abs(h_f)
 
 from matplotlib.ticker import FixedLocator, LogLocator
 
@@ -181,7 +208,7 @@ def phenom_memory_ejecta_components(
     t : array
         Time array (ms)
     M_ej_dyn, v_ej_dyn, tau_dyn : float
-        Mass (kg), velocity (m/s), timescale (ms) for dynamical ejecta
+        Mass (kg), velocity (m/s), timescale (s) for dynamical ejecta
     start_dyn, end_dyn : float
         Start/end time (ms) for dynamical ejecta
     M_ej_wind, v_ej_wind, tau_wind : float
@@ -197,8 +224,8 @@ def phenom_memory_ejecta_components(
     """
 
     # Compute memory for both components (dynamical and wind) with masking 
-    h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, end_dyn, model=model)
-    h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, end_wind, model=model)
+    h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, model=model)
+    h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, model=model)
     h_tot = h_dyn + h_wind
     if plot : 
         fig, axes = plt.subplots(1, 3, figsize=(18, 6))
@@ -206,29 +233,29 @@ def phenom_memory_ejecta_components(
         axes[0].plot(t, h_dyn, color='#D7263D', linewidth=2.5)
         axes[0].fill_between(t, h_dyn, 0, color='#D7263D', alpha=0.2)
         axes[0].set_title(f"Dynamical ejecta ({start_dyn:.0f}–{end_dyn:.0f} ms)", fontsize=15, fontweight='bold')
-        axes[0].set_xlabel("t(ms)", fontsize=13)
+        axes[0].set_xlabel("t(ms)")
         axes[0].set_xlim(-1, end_dyn + 1)
         axes[0].set_yscale('linear')
-        axes[0].tick_params(axis='both', labelsize=12)
+
         axes[0].axvline(end_dyn, color='#D7263D', linestyle='--', alpha=0.7)
         if delta_h_typical :
             delta_h_typical=3.8e-25
             axes[0].axhline(delta_h_typical, color='black', linestyle='dotted', linewidth=2, alpha=0.7, label=r'Typical $\Delta h$ (Lopez et al.)')
-            axes[0].text(end_dyn, delta_h_typical*1.05, r"$3.8 \times 10^{-25}$ (Lopez et.al)", color='black', fontsize=13, va='bottom', ha='right')
+            axes[0].text(end_dyn, delta_h_typical*0.85, r"$3.8 \times 10^{-25}$ (Lopez et.al)", color='black', fontsize=13, va='bottom', ha='right')
         # Wind ejecta plot
         axes[1].plot(t, h_wind, color='#1B998B', linewidth=2.5)
         axes[1].fill_between(t, h_wind, 0, color='#1B998B', alpha=0.2)
         axes[1].set_title(f"Wind ejecta ({start_wind:.0f}–{end_wind:.0f} ms)", fontsize=15, fontweight='bold')
-        axes[1].set_xlabel("t(ms)", fontsize=13)
+        axes[1].set_xlabel("t(ms)")
         axes[1].set_xlim(0, end_wind + 5000)
         axes[1].set_xscale('symlog', linthresh=10, linscale=1.0)
-        axes[1].tick_params(axis='both', labelsize=12)
+
         axes[1].axvline(end_wind, color='#1B998B', linestyle='--', alpha=0.7)
         # Total memory plot = Dynamical + Wind
         axes[2].plot(t, h_tot, color='k', linewidth=2.5, alpha=0.85)
         axes[2].fill_between(t, h_tot, 0, color='#2E294E', alpha=0.13)
         axes[2].set_title("Total ejecta memory", fontsize=15, fontweight='bold')
-        axes[2].set_xlabel("t(ms)", fontsize=13)
+        axes[2].set_xlabel("t(ms)")
         axes[2].set_xscale('symlog', linthresh=10, linscale=1.0)
         axes[2].axvline(end_dyn, color='#D7263D', linestyle='--', alpha=0.7)
         axes[2].axvline(end_wind, color='#1B998B', linestyle='--', alpha=0.7)
@@ -236,9 +263,9 @@ def phenom_memory_ejecta_components(
         axes[2].axvline(end_dyn, color='#D7263D', linestyle='--', alpha=0.7)
         axes[2].axvline(end_wind, color='#1B998B', linestyle='--', alpha=0.7)
         axes[2].text(end_dyn-1, axes[2].get_ylim()[1]*0.45, 'dynamical', color='#D7263D',
-                    fontsize=13, fontweight='bold', rotation=0, va='top', ha='right')
+                     fontweight='bold', rotation=0, va='top', ha='right')
         axes[2].text(end_dyn + 50, axes[2].get_ylim()[1]*0.45, '+ wind', color='#1B998B',
-                    fontsize=13, fontweight='bold', rotation=0, va='top', ha='right')
+                    fontweight='bold', rotation=0, va='top', ha='right')
 
         for ax in axes:
             major_ticks = [0,10, 100, 1000, 10000]
@@ -378,8 +405,8 @@ def phenom_memory_ejecta_components_GRB(
 
 
     # Compute memory for both ejecta components
-    h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, end_dyn, model=model)
-    h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, end_wind, model=model)
+    h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, model=model)
+    h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, model=model)
     # Compute GRB memory (masked)
     h_GRB = phenom_memory_GRB(t, E_j, beta, theta, r, tau_GRB, start_GRB, end_GRB, model=model, plot=False)
     h_tot = h_dyn + h_wind + h_GRB
@@ -468,8 +495,8 @@ def phenom_memory_total_plot(
     Parameters are the same as for phenom_memory_ejecta_components_GRB.
     """
     # Compute memory for both ejecta components and GRB
-    h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, end_dyn, model=model)
-    h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, end_wind, model=model)
+    h_dyn = linear_memory_ejecta_masked(t, M_ej_dyn, v_ej_dyn, tau_dyn, r, start_dyn, model=model)
+    h_wind = linear_memory_ejecta_masked(t, M_ej_wind, v_ej_wind, tau_wind, r, start_wind, model=model)
     h_GRB = phenom_memory_GRB(t, E_j, beta, theta, r, tau_GRB, start_GRB, end_GRB, model=model, plot=False)
     h_tot = h_dyn + h_wind + h_GRB
 
@@ -626,8 +653,8 @@ def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info
     fft_h : array-like
         FFT amplitude of the memory signal
     """
-    f = np.logspace(-6, 4, int(1e5))  # Frequencies from 1e-6 to 10000 Hz with 10,000 points
-    fourier_h_square = delta_h**2 * (1-np.cos(2 * np.pi * f * tau)) /(8 * np.pi**4 * f**4 * tau**2) 
+    f = np.logspace(-6, 4, int(1e5))  
+    fourier_h_square = delta_h**2 * (1-np.cos(2 * np.pi * f * tau)) /(8 * np.pi**4 * f**4 * tau**2) # ? Replace value of 8 by 1 to get the same normalization for f->0
     caracteristic_strain = 2*f* np.sqrt(fourier_h_square)
     if plot:
         plt.figure(figsize=(8, 8))

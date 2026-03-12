@@ -109,6 +109,63 @@ def sanity_check_energy_evolution(t_days, e_erg, theta, cone_radius = 0.25):
 
 
 
+
+
+
+def analyze_energy_vs_time_and_angle_simpler(t_days, e_erg, theta, n_theta=20, n_time=50, cone_radius=0.25):
+    plt.rcParams['axes.labelsize'] = 20
+    plt.rcParams['xtick.labelsize'] = 18
+    plt.rcParams['ytick.labelsize'] = 18
+    
+    n_theta_bins = n_theta
+    n_time_bins = n_time
+    theta_bins = np.linspace(0, np.pi, n_theta_bins + 1)
+    theta_centers = 0.5 * (theta_bins[1:] + theta_bins[:-1])
+    t_bins = np.linspace(t_days.min(), t_days.max(), n_time_bins + 1)
+    t_centers = 0.5 * (t_bins[1:] + t_bins[:-1])
+    energy_matrix = np.zeros((n_time_bins, n_theta_bins))
+
+    for j, theta_center in enumerate(theta_centers):
+        mask_direction = np.abs(theta - theta_center) < cone_radius
+        if np.any(mask_direction):
+            energy_vs_time, _ = np.histogram(t_days[mask_direction], bins=t_bins, weights=e_erg[mask_direction])
+            energy_matrix[:, j] = energy_vs_time
+
+    energy_matrix[energy_matrix == 0] = np.nan
+
+        # 1. Profil temporel à différents angles (cmap inferno)
+    plt.figure(figsize=(12, 8))
+    T_mesh, Theta_mesh = np.meshgrid(t_centers, np.degrees(theta_centers))
+    im1 = plt.pcolormesh(T_mesh, Theta_mesh, energy_matrix.T,
+                        norm=LogNorm(vmin=np.nanmin(energy_matrix[energy_matrix > 0]), vmax=np.nanmax(energy_matrix)),
+                        cmap='inferno', shading='auto')
+    plt.xscale('log')
+    plt.xlabel('t [days]')
+    plt.ylabel(r'$\theta$ [deg]')
+    cbar1 = plt.colorbar(im1, pad=0.02)
+    cbar1.set_label('Energy [erg]')
+   
+    plt.savefig('energy_temporal_profile.png', dpi=150, bbox_inches='tight')
+    plt.show()
+
+    # 2. Profil angulaire à différents temps (cmap viridis)
+    plt.figure(figsize=(12, 8))
+    for idx, color in zip([0, n_time_bins//4, n_time_bins//2, 3*n_time_bins//4, n_time_bins-1], plt.cm.viridis(np.linspace(0,1,5))):
+        profile = energy_matrix[idx, :]
+        mask_nonzero = ~np.isnan(profile)
+        if np.any(mask_nonzero):
+            plt.semilogy(np.degrees(theta_centers[mask_nonzero]), profile[mask_nonzero],
+                        color=color, linewidth=2, marker='o', markersize=4,
+                        label=f't = {t_centers[idx]:.2f} d')
+    plt.xlabel(r'$\theta$ [deg]')
+    plt.ylabel('Energy [erg]')
+    plt.legend(loc='best', frameon=False, fontsize=16, bbox_to_anchor=(1.005, 1))
+  
+    plt.savefig('energy_angular_profile.png', dpi=150, bbox_inches='tight')
+    plt.show()
+    
+
+
 def analyze_energy_vs_time_and_angle(t_days, e_erg, theta, n_theta=20, n_time=50, cone_radius=0.25):
     """
     Performs a comprehensive analysis of energy evolution as a function of time and angle

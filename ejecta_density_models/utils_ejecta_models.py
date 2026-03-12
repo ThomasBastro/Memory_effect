@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from lal import C_SI, G_SI, PC_SI
+from lal import C_SI, G_SI, PC_SI, MSUN_SI
 
 from matplotlib import animation
 from matplotlib.animation import PillowWriter
@@ -267,33 +267,27 @@ def compute_ejecta_mass(
     f_d_pol=0.01, n_r=200
 ):
     """
-    Calcule la masse totale de l'éjecta à un angle theta donné et à un instant t,
-    en intégrant rho(r, t, theta) * dV sur r.
-
-    Paramètres :
-    ------------
-    rho_profile_func : fonction
-        Fonction de profil de densité (ex: rho_profile_model1 ou model2)
-    t : float
-        Temps (s)
-    theta : float
-        Angle polaire (rad)
-    v_pm_min, v_pm_max, v_d_min, v_max : float
-        Paramètres de vitesses (en unités de c)
-    f_d_pol : float
-        Contraste polaire
-    v_max : float
-        Vitesse maximale de l'éjecta (en unités de c) ~ 0.9 c
-    n_r : int
-        Nombre de points pour l'intégration radiale
-
-    Retour :
-    --------
-    mass_theta : float
-        Masse totale de l'éjecta à cet angle (en kg)
+    Compute the cumulative mass of the ejecta at a given angle theta by integrating the density profile over radius (in spherical coordinates).
+    Parameters:
+    - rho_profile_func: 
+        Function that computes the density profile (e.g., rho_profile_model1 or rho_profile_model2)
+    - t: 
+        Final time at which we evaluate the mass [s] 
+    - theta: 
+        Polar angle at which to compute the mass [rad]
+    - v_pm_min, v_pm_max, v_d_min, v_max: 
+        Velocity parameters (in units of c) of the ejecta components
+    - f_d_pol: 
+        Density contrast for polar region (default 0.01)
+    - n_r: 
+        Number of radial points for integration (default 200)
+    Returns:
+    - mass_theta_dyn: cumulative mass of dynamical ejecta at angle theta [kg]
+    - mass_theta_pm: cumulative mass of post-merger ejecta at angle theta [kg]
+    - mass_theta: cumulative total mass at angle theta [kg]
     """
     r_max = v_max * C_SI * t
-    r_min = 0.1 * C_SI * t  # pour éviter de commencer à r=0 où la densité peut diverger
+    r_min = 0.1 * C_SI * t  # avoid starting at r=0 to prevent singularities in density
     r_grid = np.linspace(r_min, r_max, n_r)
     dr = np.gradient(r_grid)
     mass_theta_dyn = 0.0
@@ -323,6 +317,132 @@ def compute_ejecta_mass(
 
     return mass_dyn_arr, mass_pm_arr, mass_tot_arr
 
+def compute_total_ejecta_mass(
+    rho_profile_func,
+    t,
+    v_pm_min, v_pm_max, v_d_min, v_max,
+    f_d_pol=0.01, n_r=200, n_theta=100, n_t=100
+):
+    """
+    Compute the total mass of the ejecta by integrating the density profile over radius, all polar angles θ, and over time from 0 to t.
+    Returns:
+    - total_mass_dyn: total mass of dynamical ejecta [kg]
+    - total_mass_pm: total mass of post-merger ejecta [kg]
+    - total_mass: total mass [kg]
+    """
+    t_grid = np.linspace(1e-6, t, n_t)  # Avoid t=0 to prevent division by zero
+    dt = np.gradient(t_grid)
+    total_mass_dyn = 0.0
+    total_mass_pm = 0.0
+    total_mass = 0.0
+
+    for i_t, t_i in enumerate(t_grid):
+        r_max = v_max * C_SI * t_i
+        r_min = 0.1 * C_SI * t_i
+        r_grid = np.linspace(r_min, r_max, n_r)
+        dr = np.gradient(r_grid)
+        theta_grid = np.linspace(0, np.pi, n_theta)
+        dtheta = np.gradient(theta_grid)
+
+        for i_theta, theta in enumerate(theta_grid):
+            sin_theta = np.sin(theta)
+            for i_r, r in enumerate(r_grid):
+                rho_dyn, rho_pm, rho_tot = rho_profile_func(
+                    r, t_i, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol
+                )
+                dV = 2 * np.pi * r**2 * sin_theta * dr[i_r] * dtheta[i_theta]
+                total_mass_dyn += rho_dyn * dV * dt[i_t]
+                total_mass_pm += rho_pm * dV * dt[i_t]
+                total_mass += rho_tot * dV * dt[i_t]
+
+    return total_mass_dyn, total_mass_pm, total_mass
+
+def compute_total_ejecta_mass_norm(
+    rho_profile_func,
+    t,
+    v_pm_min, v_pm_max, v_d_min, v_max,
+    f_d_pol=0.01, n_r=200, n_theta=100, n_t=100,
+    M_dyn_target=0.003, M_pm_target=0.02, time_sat=10
+):
+    """
+    Compute the total mass of the ejecta by integrating the density profile over radius, all polar angles θ, and over time from 0 to t.
+    The result is normalized so that at t=time_sat days, the dynamical and post-merger masses match the given values.
+    Parameters:
+    - rho_profile_func: function that computes the density profile (e.g., rho_profile_model1 or rho_profile_model2)
+    - t: final time at which to compute the mass [s]
+    - v_pm_min, v_pm_max, v_d_min, v_max: velocity parameters (in units of c) of the ejecta components
+    - f_d_pol: density contrast for polar region (default 0.01)
+    - n_r: number of radial points for integration (default 200)
+    - n_theta: number of polar angle points for integration (default 100)
+    - n_t: number of time points for integration (default 100)
+    - M_dyn_target: target mass for dynamical ejecta at time_sat days (in solar masses)
+    - M_pm_target: target mass for post-merger ejecta at time_sat days (in solar masses)
+    - time_sat: time in days at which to match the target masses (default 10 days, typical time for mass estimates in kilonova observations)
+    Returns:
+    - total_mass_dyn: total mass of dynamical ejecta [Msun]
+    - total_mass_pm: total mass of post-merger ejecta [Msun]
+    - total_mass: total mass [Msun]
+    """
+    M_dyn_target = M_dyn_target * MSUN_SI
+    M_pm_target = M_pm_target * MSUN_SI
+    t_norm = time_sat * 86400  # 10 days in seconds
+
+    # First, compute unnormalized masses at t_norm
+    t_grid_norm = np.linspace(1e-6, t_norm, n_t)
+    dt_norm = np.gradient(t_grid_norm)
+    mass_dyn_raw = 0.0
+    mass_pm_raw = 0.0
+
+    for i_t, t_i in enumerate(t_grid_norm):
+        r_max = v_max * C_SI * t_i
+        r_min = 0.1 * C_SI * t_i
+        r_grid = np.linspace(r_min, r_max, n_r)
+        dr = np.gradient(r_grid)
+        theta_grid = np.linspace(0, np.pi, n_theta)
+        dtheta = np.gradient(theta_grid)
+
+        for i_theta, theta in enumerate(theta_grid):
+            sin_theta = np.sin(theta)
+            for i_r, r in enumerate(r_grid):
+                rho_dyn, rho_pm, _ = rho_profile_func(
+                    r, t_i, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol
+                )
+                dV = 2 * np.pi * r**2 * sin_theta * dr[i_r] * dtheta[i_theta]
+                mass_dyn_raw += rho_dyn * dV * dt_norm[i_t]
+                mass_pm_raw += rho_pm * dV * dt_norm[i_t]
+
+    # Compute normalization factors
+    norm_dyn = M_dyn_target / mass_dyn_raw if mass_dyn_raw > 0 else 1.0
+    norm_pm = M_pm_target / mass_pm_raw if mass_pm_raw > 0 else 1.0
+
+    # Now compute normalized masses for requested t
+    t_grid = np.linspace(1e-6, t, n_t)
+    dt = np.gradient(t_grid)
+    total_mass_dyn = 0.0
+    total_mass_pm = 0.0
+    total_mass = 0.0
+
+    for i_t, t_i in enumerate(t_grid):
+        r_max = v_max * C_SI * t_i
+        r_min = 0.1 * C_SI * t_i
+        r_grid = np.linspace(r_min, r_max, n_r)
+        dr = np.gradient(r_grid)
+        theta_grid = np.linspace(0, np.pi, n_theta)
+        dtheta = np.gradient(theta_grid)
+
+        for i_theta, theta in enumerate(theta_grid):
+            sin_theta = np.sin(theta)
+            for i_r, r in enumerate(r_grid):
+                rho_dyn, rho_pm, rho_tot = rho_profile_func(
+                    r, t_i, theta, v_pm_min, v_pm_max, v_d_min, v_max, f_d_pol
+                )
+                dV = 2 * np.pi * r**2 * sin_theta * dr[i_r] * dtheta[i_theta]
+                total_mass_dyn += norm_dyn * rho_dyn * dV * dt[i_t]
+                total_mass_pm += norm_pm * rho_pm * dV * dt[i_t]
+                total_mass += (norm_dyn * rho_dyn + norm_pm * rho_pm) * dV * dt[i_t]
+
+    return total_mass_dyn/MSUN_SI, total_mass_pm/MSUN_SI, total_mass/MSUN_SI
+
 
 def compute_memory_from_density_profile(
     rho_profile_func,
@@ -333,35 +453,30 @@ def compute_memory_from_density_profile(
     tau=1e-3,
     model='exponential'
 ):
-    """
-    Calcule la mémoire linéaire phénoménologique pour un angle donné à partir d'un profil de densité.
-
-    Paramètres :
-    ------------
-    rho_profile_func : fonction
-        Fonction de profil de densité (ex: rho_profile_model1 ou model2)
-    t : float
-        Time at which to compute the memory (s) - time at which the ejecta has expanded and we want to evaluate the memory
-    theta : float
-        Angle polaire (rad)
-    v_pm_min, v_pm_max, v_d_min, v_max : float
-        Paramètres de vitesses (en unités de c)
-    f_d_pol : float
-        Contraste polaire
-    r_min, r_max : float
-        Bornes d'intégration en rayon (m)
-    n_r : int
-        Nombre de points pour l'intégration radiale
-    distance_pc : float
-        Distance à la source (parsec)
-    tau : float
-        Temps caractéristique pour la montée de la mémoire (s)
-    model : str
-        'exponential' ou 'tanh'
-    Retour :
+    """    
+    Calculates the phenomenological linear memory for a given angle from a density profile.    
+    Parameters:    
+    ------------    
+    rho_profile_func: function    
+        Density profile function (e.g., rho_profile_model1 or model2)
+    t: float
+        Time at which to compute the memory [s] - time at which the ejecta has expanded and we want to evaluate the memory
+    theta: float
+        Polar angle (rad)
+    v_pm_min, v_pm_max, v_d_min, v_max: float
+        Velocity parameters (in units of c) of the ejecta components
+    distance_pc: float
+        Distance to the source [pc], default 40 Mpc (distance of GW170817)
+    tau: float
+        Characteristic time for memory rise [s]
+    model: str
+    'exponential' or 'tanh'
+    Return:
     --------
-    h_t : array (len(t_arr),)
-        Mémoire linéaire pour chaque temps à l'angle donné
+    t_arr: array :
+         Time array associated to the memory evolution
+    h_t: array :
+        Memory amplitude as a function of time (t_arr) for the given angle theta
     """
     r_min = 0.1 * C_SI * t
     r_max = v_max * C_SI * t
@@ -407,8 +522,28 @@ def plot_memory_vs_theta(
     model='exponential'
 ):
     """
-    Calcule et affiche la mémoire linéaire phénoménologique pour plusieurs angles theta.
-    Affiche une heatmap (t, theta) de la mémoire.
+    Plots the final memory amplitude (at the last time step) as a function of the viewing angle theta for a given density profile model.
+    This function should be used in pair with compute_memory_from_density_profile to evaluate the memory at different angles and then plot the results.
+    Parameters:
+------------
+    rho_profile_func: function
+        Density profile function (e.g., rho_profile_model1 or model2)
+    t_arr: array
+        Time array for memory evolution (used to compute h(t) for each angle)
+    theta_arr: array
+        Array of viewing angles (in radians) to evaluate the memory
+    v_pm_min, v_pm_max, v_d_min, v_max: float
+        Velocity parameters (in units of c) of the ejecta components
+    f_d_pol: float
+        Density contrast for polar region (default 0.01)
+    n_r: int
+        Number of radial points for mass integration (default 2000 for better accuracy in memory calculation)
+    distance_pc: float
+        Distance to the source [pc], default 40 Mpc (distance of GW170817)
+    tau: float
+        Characteristic time for memory rise [s]
+    model: str
+        Time evolution model for memory rise ('exponential' or 'tanh')
     """
     memory_map = []
     for theta in theta_arr:
