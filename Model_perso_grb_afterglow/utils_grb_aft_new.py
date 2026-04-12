@@ -59,29 +59,35 @@ def plot_grb_afterglow(t, delta_h, f, h_ft, h_GRB, h_aft, T_90, t_dec, t_jet_bre
 
     # Domaine temporel
     axs[0].plot(t, delta_h, label='GRB + Afterglow', color='k', lw=2.5)
-    axs[0].axvline(x=T_90, color='g', linestyle='--', label='GRB Saturation')
-    axs[0].axvline(x=t_dec, color='b', linestyle='--', label='Afterglow Start')
-    axs[0].axvline(x=t_jet_break, color='m', linestyle='--', label='Afterglow Saturation')
-    axs[0].axhline(y=delta_h_GRB, color='c', linestyle='--', label='GRB Memory Level')
-    axs[0].axhline(y=delta_h_aft + delta_h_GRB, color='y', linestyle='dotted', label='Afterglow Memory Level')
+
+    axs[0].fill_betweenx([delta_h_GRB, delta_h_GRB + delta_h_aft], t_dec, t_jet_break, color='navy', alpha=0.3, label='Afterglow Growth')
+
+    axs[0].fill_betweenx([0, delta_h_GRB], 0, T_90, color='forestgreen', alpha=0.3, label='GRB Growth')
+    # add text with double arrow for T_90, t_dec and t_jet_break
+    axs[0].annotate('', xy=(T_90, 1e-25), xytext=(0, 1e-25), arrowprops=dict(arrowstyle='<->', color='forestgreen'))
+    axs[0].annotate(r'$T_{90}$', xy=(T_90/2, 1e-25), xytext=(T_90/2,1e-25), ha='center', color='forestgreen', va='bottom', fontsize=12)
+    # same for t_jet_break - t_dec starting from 0 to t_jet_break - t_dec
+    axs[0].annotate('', xy=(t_dec, 1e-24), xytext=(t_jet_break, 1e-24), arrowprops=dict(arrowstyle='<->', color='navy'))
+    axs[0].annotate(r'$t_{jet} - t_{dec}$', xy=((t_dec + t_jet_break)/2, 1e-24), xytext=((t_dec + t_jet_break)/2,1e-24), ha='center', color='navy', va='bottom', fontsize=12)
+
+    
     axs[0].set_xlabel('t [s]')
     axs[0].set_ylabel(r'$h_+$')
     axs[0].set_title('Temporal Domain')
-    axs[0].legend()
+    axs[0].legend(loc ='lower right', frameon=False)
     axs[0].set_yscale('log')
     
     axs[0].set_xlim([t[0], min(t[-1], t_jet_break*1.2)])
 
     # Domaine fréquentiel
-    axs[1].loglog(f, 2*f*h_ft, label='Total GRB + Afterglow', color='crimson', lw=2, zorder = 5)
-    axs[1].loglog(f, 2*f*h_GRB, label='GRB', alpha=0.7, lw=1.5, ls = '-.', zorder = 10, color = 'teal')
-    axs[1].loglog(f, 2*f*h_aft, label='Afterglow', alpha=0.7, lw=1.5, ls='-.', zorder =10, color = 'navy')
-    axs[1].plot(f, 2*h_ft[0] * (f / f[0])**(-1), 'k--', label=r'$f^{-1}$')
+    axs[1].loglog(f, 2*f*h_ft, label='Total GRB + Afterglow', color='k', lw=3, zorder=20, alpha=1)
+    axs[1].loglog(f, 2*f*h_GRB, label='GRB', alpha=0.45, lw=1.5, ls='-.', zorder=5, color='forestgreen')
+    axs[1].loglog(f, 2*f*h_aft, label='Afterglow', alpha=0.45, lw=1.5, ls=':', zorder=5, color='navy')
+ 
     axs[1].set_xlabel('f [Hz]')
     axs[1].set_ylabel(r'$h_c~[f]$')
     axs[1].set_title('Frequency Domain')
 
-    axs[1].legend()
 
 
     return fig, axs
