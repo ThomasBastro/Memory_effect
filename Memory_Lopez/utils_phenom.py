@@ -655,7 +655,7 @@ def memory_fft_formula(delta_h, tau, plot=True, save=False, show=False, add_info
     """
     f = np.logspace(-6, 4, int(1e5))  
     fourier_h_square = delta_h**2 * (1-np.cos(2 * np.pi * f * tau)) /(8 * np.pi**4 * f**4 * tau**2) # ? Replace value of 8 by 1 to get the same normalization for f->0
-    caracteristic_strain = 2*f* np.sqrt(fourier_h_square)
+    caracteristic_strain = 2*f* np.sqrt(fourier_h_square) *np.pi
     if plot:
         plt.figure(figsize=(8, 8))
         plt.loglog(f,caracteristic_strain , '-', linewidth=2)

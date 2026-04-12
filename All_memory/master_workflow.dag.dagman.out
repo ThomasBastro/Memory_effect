@@ -1,0 +1,98 @@
+04/10/26 11:17:29 ******************************************************
+04/10/26 11:17:29 ** condor_scheduniv_exec.444.0 (CONDOR_DAGMAN) STARTING UP
+04/10/26 11:17:29 ** /usr/bin/condor_dagman
+04/10/26 11:17:29 ** SubsystemInfo: name=DAGMAN type=DAGMAN(9) class=CLIENT(2)
+04/10/26 11:17:29 ** Configuration: subsystem:DAGMAN local:<NONE> class:CLIENT
+04/10/26 11:17:29 ** $CondorVersion: 10.9.0 2023-09-28 BuildID: 678228 PackageID: 10.9.0-1.1 $
+04/10/26 11:17:29 ** $CondorPlatform: X86_64-Ubuntu_22.04 $
+04/10/26 11:17:29 ** PID = 1772062
+04/10/26 11:17:29 ** Log last touched time unavailable (No such file or directory)
+04/10/26 11:17:29 ******************************************************
+04/10/26 11:17:29 Using config source: /etc/condor/condor_config
+04/10/26 11:17:29 Using local config sources: 
+04/10/26 11:17:29    /etc/condor/config.d/00-htcondor-9.0.config
+04/10/26 11:17:29    /etc/condor/config.d/00-minicondor
+04/10/26 11:17:29    /etc/condor/config.d/99-custom-cpus.conf
+04/10/26 11:17:29    /etc/condor/config.d/99-dynamic-slots.conf
+04/10/26 11:17:29    /etc/condor/condor_config.local
+04/10/26 11:17:29 config Macros = 96, Sorted = 96, StringBytes = 2753, TablesBytes = 3528
+04/10/26 11:17:29 CLASSAD_CACHING is ENABLED
+04/10/26 11:17:29 Daemon Log is logging: D_ALWAYS D_ERROR D_STATUS
+04/10/26 11:17:29 DaemonCore: No command port requested.
+04/10/26 11:17:29 Using DAGMan config file: /home/stu_brabant/Memory_effect/All_memory/config.txt
+04/10/26 11:17:29 DAGMAN_USE_STRICT setting: 1
+04/10/26 11:17:29 DAGMAN_VERBOSITY setting: 3
+04/10/26 11:17:29 DAGMAN_DEBUG_CACHE_SIZE setting: 5242880
+04/10/26 11:17:29 DAGMAN_DEBUG_CACHE_ENABLE setting: False
+04/10/26 11:17:29 DAGMAN_SUBMIT_DELAY setting: 0
+04/10/26 11:17:29 DAGMAN_MAX_SUBMIT_ATTEMPTS setting: 3
+04/10/26 11:17:29 DAGMAN_STARTUP_CYCLE_DETECT setting: False
+04/10/26 11:17:29 DAGMAN_MAX_SUBMITS_PER_INTERVAL setting: 100
+04/10/26 11:17:29 DAGMAN_AGGRESSIVE_SUBMIT setting: False
+04/10/26 11:17:29 DAGMAN_USER_LOG_SCAN_INTERVAL setting: 5
+04/10/26 11:17:29 DAGMAN_QUEUE_UPDATE_INTERVAL setting: 300
+04/10/26 11:17:29 DAGMAN_DEFAULT_PRIORITY setting: 0
+04/10/26 11:17:29 DAGMAN_SUPPRESS_NOTIFICATION setting: True
+04/10/26 11:17:29 allow_events (DAGMAN_ALLOW_EVENTS) setting: 114
+04/10/26 11:17:29 DAGMAN_RETRY_SUBMIT_FIRST setting: True
+04/10/26 11:17:29 DAGMAN_RETRY_NODE_FIRST setting: False
+04/10/26 11:17:29 DAGMAN_MAX_JOBS_IDLE setting: 1000
+04/10/26 11:17:29 DAGMAN_MAX_JOBS_SUBMITTED setting: 0
+04/10/26 11:17:29 DAGMAN_MAX_PRE_SCRIPTS setting: 10
+04/10/26 11:17:29 DAGMAN_MAX_POST_SCRIPTS setting: 10
+04/10/26 11:17:29 DAGMAN_MAX_HOLD_SCRIPTS setting: 20
+04/10/26 11:17:29 DAGMAN_MUNGE_NODE_NAMES setting: True
+04/10/26 11:17:29 DAGMAN_PROHIBIT_MULTI_JOBS setting: False
+04/10/26 11:17:29 DAGMAN_SUBMIT_DEPTH_FIRST setting: False
+04/10/26 11:17:29 DAGMAN_ALWAYS_RUN_POST setting: False
+04/10/26 11:17:29 DAGMAN_CONDOR_SUBMIT_EXE setting: /usr/bin/condor_submit
+04/10/26 11:17:29 DAGMAN_USE_DIRECT_SUBMIT setting: True
+04/10/26 11:17:29 DAGMAN_DEFAULT_APPEND_VARS setting: False
+04/10/26 11:17:29 DAGMAN_ABORT_DUPLICATES setting: True
+04/10/26 11:17:29 DAGMAN_ABORT_ON_SCARY_SUBMIT setting: True
+04/10/26 11:17:29 DAGMAN_PENDING_REPORT_INTERVAL setting: 600
+04/10/26 11:17:29 DAGMAN_AUTO_RESCUE setting: True
+04/10/26 11:17:29 DAGMAN_MAX_RESCUE_NUM setting: 100
+04/10/26 11:17:29 DAGMAN_WRITE_PARTIAL_RESCUE setting: True
+04/10/26 11:17:29 DAGMAN_DEFAULT_NODE_LOG setting: @(DAG_DIR)/@(DAG_FILE).nodes.log
+04/10/26 11:17:29 DAGMAN_GENERATE_SUBDAG_SUBMITS setting: True
+04/10/26 11:17:29 DAGMAN_MAX_JOB_HOLDS setting: 100
+04/10/26 11:17:29 DAGMAN_HOLD_CLAIM_TIME setting: 20
+04/10/26 11:17:29 ALL_DEBUG setting: 
+04/10/26 11:17:29 DAGMAN_DEBUG setting: 
+04/10/26 11:17:29 DAGMAN_SUPPRESS_JOB_LOGS setting: False
+04/10/26 11:17:29 DAGMAN_REMOVE_NODE_JOBS setting: True
+04/10/26 11:17:29 DAGMAN will adjust edges after parsing
+04/10/26 11:17:29 argv[0] == "condor_scheduniv_exec.444.0"
+04/10/26 11:17:29 argv[1] == "-Lockfile"
+04/10/26 11:17:29 argv[2] == "master_workflow.dag.lock"
+04/10/26 11:17:29 argv[3] == "-AutoRescue"
+04/10/26 11:17:29 argv[4] == "1"
+04/10/26 11:17:29 argv[5] == "-DoRescueFrom"
+04/10/26 11:17:29 argv[6] == "0"
+04/10/26 11:17:29 argv[7] == "-Dag"
+04/10/26 11:17:29 argv[8] == "master_workflow.dag"
+04/10/26 11:17:29 argv[9] == "-Suppress_notification"
+04/10/26 11:17:29 argv[10] == "-CsdVersion"
+04/10/26 11:17:29 argv[11] == "$CondorVersion: 10.9.0 2023-09-28 BuildID: 678228 PackageID: 10.9.0-1.1 $"
+04/10/26 11:17:29 argv[12] == "-Dagman"
+04/10/26 11:17:29 argv[13] == "/usr/bin/condor_dagman"
+04/10/26 11:17:29 Can't open directory "/etc/condor/passwords.d" as PRIV_ROOT, errno: 13 (Permission denied)
+04/10/26 11:17:29 Can't open directory "/etc/condor/passwords.d" as PRIV_ROOT, errno: 13 (Permission denied)
+04/10/26 11:17:29 Workflow batch-id: <444.0>
+04/10/26 11:17:29 Workflow batch-name: <master_workflow.dag+444>
+04/10/26 11:17:29 Workflow accounting_group: <>
+04/10/26 11:17:29 Workflow accounting_group_user: <>
+04/10/26 11:17:29 Warning: failed to get attribute DAGNodeName
+04/10/26 11:17:29 DAGMAN_LOG_ON_NFS_IS_ERROR setting: False
+04/10/26 11:17:29 Default node log file is: </home/stu_brabant/Memory_effect/All_memory/./master_workflow.dag.nodes.log>
+04/10/26 11:17:29 DAG Lockfile will be written to master_workflow.dag.lock
+04/10/26 11:17:29 DAG Input file is master_workflow.dag
+04/10/26 11:17:29 Parsing 1 dagfiles
+04/10/26 11:17:29 Parsing master_workflow.dag ...
+04/10/26 11:17:29 master_workflow.dag (line 13): ERROR: expected JOB, DATA, SUBDAG, FINAL, SCRIPT, PARENT, RETRY, ABORT-DAG-ON, DOT, VARS, PRIORITY, CATEGORY, MAXJOBS, CONFIG, SET_JOB_ATTR, SPLICE, PROVISIONER, SERVICE, NODE_STATUS_FILE, REJECT, JOBSTATE_LOG, PRE_SKIP, DONE, CONNECT, PIN_IN, PIN_OUT, INCLUDE, SAVE_POINT_FILE orSUBMIT-DESCRIPTION token (found FOREACH)
+04/10/26 11:17:29 Removing any/all submitted HTCondor jobs...
+04/10/26 11:17:29 Running: /usr/bin/condor_rm -const DAGManJobId==444 -reason Startup' 'Error:' 'DAGMan' 'failed' 'to' 'parse' 'DAG' 'file' '(master_workflow.dag).' 'Was' 'likely' 'in' 'recovery' 'mode.
+04/10/26 11:17:29 Disabling log line cache.
+04/10/26 11:17:29 Failed to parse master_workflow.dag
+04/10/26 11:17:29 **** condor_scheduniv_exec.444.0 (condor_DAGMAN) pid 1772062 EXITING WITH STATUS 1

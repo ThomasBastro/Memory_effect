@@ -1,0 +1,6 @@
+# config.txt
+#
+# Décommentez UNE SEULE des lignes suivantes pour choisir le calcul à lancer.
+#
+TAG="Egrb_vs_dist" NUM_GLOBAL="100" NUM_ZOOM="50"
+#TAG="dyn_memory" NUM_GLOBAL="100" NUM_ZOOM="50"

@@ -38,6 +38,50 @@ def apply_window(signal, window_type='tukey', alpha=0.2):
         raise ValueError("Window type must be 'tukey' or 'hann'")
     return signal * window
 
+def apply_window_half(signal, window_type='tukey', alpha=0.2, frac=0.5):
+    """
+    Apply a window (Tukey or Hann) to the second half of the signal only.
+    The first half is left unchanged.
+    ---
+    Parameters:
+- signal: input signal (numpy array)
+- window_type: 'tukey' or 'hann'
+- alpha: parameter for the tukey window (alpha = 0 is rectangular, alpha = 1 is hann)
+- frac: fraction of the signal to apply the window to (default 0.5 for the second half)
+    ---
+    Returns:
+- signal with the window applied to the specified fraction of the signal
+    """
+    n_signal = len(signal)
+    n_win = int(frac * n_signal)
+    window = np.ones(n_signal)
+    if window_type == 'tukey':
+        win = tukey(2 * n_win, alpha)[n_win:]  # partie décroissante
+    elif window_type == 'hann':
+        win = hann(2 * n_win)[n_win:]  # partie décroissante
+    else:
+        raise ValueError("Window type must be 'tukey' or 'hann'")
+    window[-n_win:] = win
+    return signal * window
+
+def pad_and_taper(signal, time, padding_length, window_type='tukey', alpha=0.2):
+    dt = time[1] - time[0]
+    n_pad = int(padding_length / dt)
+    signal_padded = np.pad(signal, (0, n_pad), mode='edge')
+  
+    times_padded = np.arange(time[0], time[0] + len(signal_padded) * dt, dt)
+    window = np.ones_like(signal_padded)
+    if n_pad > 0:
+        if window_type == 'tukey':
+            win = tukey(2 * n_pad, alpha)[n_pad:]
+        elif window_type == 'hann':
+            win = hann(2 * n_pad)[n_pad:]
+        else:
+            raise ValueError("Window type must be 'tukey' or 'hann'")
+        window[-n_pad:] = win
+    signal_windowed = signal_padded * window
+    return times_padded, signal_windowed
+
 def pad_signal(signal, time, r):
     """
     Pad the signal and time array with zeros to the right.

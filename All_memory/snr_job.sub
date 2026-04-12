@@ -1,0 +1,29 @@
+# snr_job.sub
+# Fichier de soumission générique pour le DAG
+
+universe   = vanilla
+executable = /usr/bin/python3
+
+# Les arguments seront fournis par le fichier DAG
+arguments  = $(ARGS)
+
+# Fichiers de log, d'erreur et de sortie
+# Les noms seront définis dans le fichier DAG
+log        = $(LOG_DIR)/$(LOG_NAME).log
+error      = $(LOG_DIR)/$(LOG_NAME).err
+output     = $(LOG_DIR)/$(LOG_NAME).out
+
+# Transférer les fichiers de données nécessaires pour chaque job
+# Assurez-vous que ces fichiers sont bien dans le dossier All_memory/
+transfer_input_files = ET_D_sensi.txt, GW170817_memory_time_domain.txt, GW170817_memory_characteristic_strain.txt, memory_vs_time_32deg.txt, memory_fft_32deg_interp.txt, utils_phenom.py, utils_GRB_afterglow_phenom.py
+
+# Ne pas transférer le script python lui-même s'il est sur un disque partagé
+# Si ce n'est pas le cas, ajoutez-le à transfer_input_files
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+
+# Exigences (optionnel, mais recommandé)
+# request_cpus = 1
+# request_memory = 2GB
+
+queue 1

@@ -1,0 +1,49 @@
+# =================================================================
+# master_workflow.dag : UN SEUL FICHIER POUR TOUT GERER
+# =================================================================
+
+# --- Configuration ---
+CONFIG config.txt
+
+# =================================================================
+# SECTION 1 & 2 : Jobs de calcul pour les deux grilles
+# =================================================================
+
+# Crée les jobs pour la grille GLOBALE en boucle
+FOREACH i IN 0..$(NUM_GLOBAL-1)
+    JOB CalcGlobal_$(i) snr_job.sub
+    VARS CalcGlobal_$(i) LOG_DIR="condor_logs"
+    VARS CalcGlobal_$(i) TAG="$(TAG)"
+    VARS CalcGlobal_$(i) LOG_NAME="job_$(TAG)_global_$(i)"
+    VARS CalcGlobal_$(i) ARGS="170817_snr_condor.py --mode condor_row --tag $(TAG) --grid-type global --row-index $(i)"
+ENDFOREACH
+
+# Crée les jobs pour la grille ZOOMÉE en boucle
+FOREACH j IN 0..$(NUM_ZOOM-1)
+    JOB CalcZoom_$(j) snr_job.sub
+    VARS CalcZoom_$(j) LOG_DIR="condor_logs"
+    VARS CalcZoom_$(j) TAG="$(TAG)"
+    VARS CalcZoom_$(j) LOG_NAME="job_$(TAG)_zoom_$(j)"
+    VARS CalcZoom_$(j) ARGS="170817_snr_condor.py --mode condor_row --tag $(TAG) --grid-type zoom --row-index $(j)"
+ENDFOREACH
+
+# =================================================================
+# SECTION 3 : Job final d'agrégation et de plotting
+# =================================================================
+
+JOB AggregatePlot snr_job.sub
+VARS AggregatePlot LOG_DIR="condor_logs"
+VARS AggregatePlot LOG_NAME="job_$(TAG)_aggregate"
+VARS AggregatePlot ARGS="170817_snr_condor.py --mode aggregate --tag $(TAG)"
+
+# =================================================================
+# SECTION 4 : Définition des dépendances
+# =================================================================
+
+# Crée des catégories pour grouper les jobs
+CATEGORY CalcGlobal_... AllGlobalJobs
+CATEGORY CalcZoom_... AllZoomJobs
+
+# Le job AggregatePlot ne démarrera que lorsque les DEUX catégories
+# de jobs seront terminées avec succès.
+PARENT AllGlobalJobs AllZoomJobs CHILD AggregatePlot
