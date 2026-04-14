@@ -35,8 +35,10 @@ def fft(f, h_GRB, T_90, h_aft, t_dec, t_jet):
     """
     Calcul de |h̃(f)| pour le modèle GRB + afterglow (approximation analytique).
     """
+    if t_dec > t_jet:
+        t_dec, t_jet = t_jet, t_dec  # s'assurer que t_dec < t_jet
     f = np.asarray(f)
-    dt_aft = t_jet - t_dec
+    dt_aft = np.abs(t_jet - t_dec)
 
     def fourier_amplitude_squared(f, h, tau):
         a = h/(4*np.pi**2 * f**2 * tau)
@@ -66,23 +68,33 @@ def plot_grb_afterglow(t, delta_h, f, h_ft, h_GRB, h_aft, T_90, t_dec, t_jet_bre
     # add text with double arrow for T_90, t_dec and t_jet_break
     axs[0].annotate('', xy=(T_90, 1e-25), xytext=(0, 1e-25), arrowprops=dict(arrowstyle='<->', color='forestgreen'))
     axs[0].annotate(r'$T_{90}$', xy=(T_90/2, 1e-25), xytext=(T_90/2,1e-25), ha='center', color='forestgreen', va='bottom', fontsize=12)
+    # add arrpw at t = T90 to show the jump in amplitude of GRB
+    ymin = axs[0].get_ylim()[0]
+
+    axs[0].annotate('', xy=(T_90, delta_h_GRB), xytext=(T_90, delta_h_GRB/25), arrowprops=dict(arrowstyle='->', color='forestgreen'))
+    axs[0].annotate(r'$\Delta h_{\rm GRB}$', xy=(T_90, delta_h_GRB*0.55), xytext=(T_90, delta_h_GRB*0.55), ha='left', color='forestgreen', va='bottom', fontsize=14)
     # same for t_jet_break - t_dec starting from 0 to t_jet_break - t_dec
+    center = np.sqrt(t_dec * t_jet_break)
     axs[0].annotate('', xy=(t_dec, 1e-24), xytext=(t_jet_break, 1e-24), arrowprops=dict(arrowstyle='<->', color='navy'))
-    axs[0].annotate(r'$t_{jet} - t_{dec}$', xy=((t_dec + t_jet_break)/2, 1e-24), xytext=((t_dec + t_jet_break)/2,1e-24), ha='center', color='navy', va='bottom', fontsize=12)
+    axs[0].annotate(r'$t_{jet} - t_{dec}$', xy=(center, 1e-24), xytext=(center,1e-24), ha='center', color='navy', va='bottom', fontsize=14)
+    # arrow to show the jump in amplitude of afterglow at t_jet_break
+    axs[0].annotate('', xy=(t_jet_break, delta_h_GRB + delta_h_aft), xytext=(t_jet_break, delta_h_GRB ), arrowprops=dict(arrowstyle='->', color='navy'))
+    axs[0].annotate(r'$\Delta h_{\rm aft}$', xy=(t_jet_break, (delta_h_GRB + delta_h_aft)*0.5), xytext=(t_jet_break, (delta_h_GRB + delta_h_aft)*0.5), ha='left', color='navy', va='bottom', fontsize=14)
+    
 
     
     axs[0].set_xlabel('t [s]')
     axs[0].set_ylabel(r'$h_+$')
     axs[0].set_title('Temporal Domain')
-    axs[0].legend(loc ='lower right', frameon=False)
+    axs[0].legend(loc ='lower right', frameon=False, fontsize=14)
     axs[0].set_yscale('log')
     
     axs[0].set_xlim([t[0], min(t[-1], t_jet_break*1.2)])
 
     # Domaine fréquentiel
-    axs[1].loglog(f, 2*f*h_ft, label='Total GRB + Afterglow', color='k', lw=3, zorder=20, alpha=1)
-    axs[1].loglog(f, 2*f*h_GRB, label='GRB', alpha=0.45, lw=1.5, ls='-.', zorder=5, color='forestgreen')
-    axs[1].loglog(f, 2*f*h_aft, label='Afterglow', alpha=0.45, lw=1.5, ls=':', zorder=5, color='navy')
+    axs[1].loglog(f, 2*f*h_ft, label='Total GRB + Afterglow', color='k', lw=3, zorder=2, alpha=0.85)
+    axs[1].loglog(f, 2*f*h_GRB, label='GRB', alpha=0.75, lw=1.5, ls='-.', zorder=5, color='forestgreen')
+    axs[1].loglog(f, 2*f*h_aft, label='Afterglow', alpha=0.75, lw=1.5, ls=':', zorder=5, color='navy')
  
     axs[1].set_xlabel('f [Hz]')
     axs[1].set_ylabel(r'$h_c~[f]$')
