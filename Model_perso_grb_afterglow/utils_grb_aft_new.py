@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lal import PC_SI, C_SI, G_SI
+PC_SI = 3.086e16  # parsec en mètres
+G_SI = 6.67430e-11  # constante gravitationnelle en m^3 kg^-1 s^-2
+C_SI = 299792458  # vitesse de la lumière en m/s
 
-def grb_afterglow_model(t, E_GRB, T_90, E_aft, beta, t_dec, t_jet_break, d, theta, theta_j):
+def grb_afterglow_model(t, E_GRB, T_90, E_aft, beta, t_dec, t_jet_break, d, theta, theta_0):
     
     E_GRB *= 1e-7 # convert erg to J
     E_aft *= 1e-7 # convert erg to J
@@ -100,6 +102,102 @@ def plot_grb_afterglow(t, delta_h, f, h_ft, h_GRB, h_aft, T_90, t_dec, t_jet_bre
     axs[1].set_ylabel(r'$h_c~[f]$')
     axs[1].set_title('Frequency Domain')
 
-
-
     return fig, axs
+
+# --- Mass distribution in the jet ---
+# Models from http://arxiv.org/abs/1302.5713 eq. III.1 
+from tqdm import tqdm
+
+
+def f_theta(theta, theta_0=0.1, Gamma=100, jet_type='uniform'):
+    
+    theta_core = 1.0 / Gamma
+
+    if jet_type == 'uniform':
+        return np.where(theta <= theta_0, 1.0, 0.0)
+    elif jet_type == 'structured':
+        f = np.zeros_like(theta)
+        mask_core = theta < theta_core
+        mask_wing = (theta >= theta_core) & (theta < theta_0)
+        f[mask_core] = 1.0
+        f[mask_wing] = (Gamma * theta[mask_wing])**-2
+        return f
+    else:
+        raise ValueError("jet_type doit être 'uniform' ou 'structured'")
+
+
+
+def grb_memory_jet_grb(
+    t, E_GRB, T_90, E_aft, beta, t_dec, t_jet_break, d_pc,
+    theta_v, theta_0, Gamma, jet_type='uniform', n_theta=100, n_phi=100
+):
+    d = d_pc * PC_SI
+
+    # 1. Grilles angulaires
+    eps = 1e-8  # éviter theta=0 exact
+    thetas = np.linspace(eps, theta_0, n_theta)
+    phis = np.linspace(0, 2 * np.pi, n_phi)
+    dtheta = thetas[1] - thetas[0]
+    dphi = phis[1] - phis[0]
+
+    # 2. Normalisation de f(theta)
+    f_vals = f_theta(thetas, theta_0, Gamma, jet_type)
+    # Intégrale de f sur la sphère : \int f sin(theta) dtheta dphi
+    norm = np.sum(f_vals * np.sin(thetas)) * dtheta * dphi * n_phi
+    f_vals /= norm
+ 
+    
+    
+
+    # 3. Intégration 2D correcte
+    delta_h_jet_grb = 0.0
+ 
+    for i in range(n_theta):
+     
+
+        theta = thetas[i]
+        if theta < eps:
+            continue
+
+        for j in range(n_phi):
+            phi = phis[j]
+            cos_xi = (
+                np.cos(theta) * np.cos(theta_v)
+                + np.sin(theta) * np.sin(theta_v) * np.cos(phi)
+            )
+            xi = np.arccos(np.clip(cos_xi, -1, 1))
+            _, dh_grb_xi, _ = grb_afterglow_model(
+                t, E_GRB, T_90, E_aft, beta, t_dec, t_jet_break, d_pc, xi, theta_0
+            )
+            delta_h_jet_grb += (
+                f_vals[i]
+                * dh_grb_xi
+                * np.sin(theta)
+                * dtheta
+                * dphi
+            )
+
+    # Signal total (jet GRB + afterglow)
+
+    t_array = np.array(t)
+    delta_h = np.zeros_like(t_array)
+    
+    # Contribution Prompt (GRB)
+    mask_prompt = (t_array >= 0) & (t_array < T_90)
+    mask_after_prompt = (t_array >= T_90)
+    delta_h[mask_prompt] = delta_h_jet_grb * (t_array[mask_prompt] / T_90)
+    delta_h[mask_after_prompt] = delta_h_jet_grb
+
+    # 5. Contribution Afterglow (Attention : Formule point-source ici)
+    # Si tu veux être rigoureux, delta_h_aft devrait aussi être dans l'intégrale ci-dessus
+    prefactor_aft = (G_SI / C_SI**4) * (2 * E_aft * beta**2 / d)
+    geom_term = (np.sin(theta_v)**2 / (1 - beta * np.cos(theta_v)))
+    delta_h_aft_total = prefactor_aft * geom_term
+
+    mask_aft = (t_array >= t_dec) & (t_array < t_jet_break)
+    mask_after_aft = (t_array >= t_jet_break)
+    
+    delta_h[mask_aft] += delta_h_aft_total * ((t_array[mask_aft] - t_dec) / (t_jet_break - t_dec))
+    delta_h[mask_after_aft] += delta_h_aft_total
+
+    return delta_h, delta_h_jet_grb, delta_h_aft_total

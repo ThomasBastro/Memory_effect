@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 # --- PARAMÈTRES PAR DÉFAUT POUR LE MODÈLE UNIFIÉ ---
 DEFAULT_T90 = 100.0
 DEFAULT_TDEC = 50.0
-DEFAULT_TJET = 3 * 86400.0  # 3 jours en secondes
+DEFAULT_TJET = 1 * 86400.0  # 3 jours en secondes
 
 def compute_hc_grb_only(params_grb):
     # Récupération des paramètres requis
@@ -350,6 +350,52 @@ def plot_tjet_tdec_delta_lines(ax, x_vals, y_vals, xscale='log', yscale='log'):
         else:
             print(f"Aucune ligne tracée pour delta={delta} car hors des limites du graphique.")
     ax.legend(loc='lower right', fontsize=14)
+    
+def plot_hc_vs_lisa(grb_dict, outdir="plots_hc", fname="hc_vs_lisa.png"):
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    os.makedirs(outdir, exist_ok=True)
+    plt.figure(figsize=(10, 7))
+
+    # 1. Tracé LISA
+    lisa = li.LISA()
+    f_lisa = np.logspace(-5, 0, 500)
+    hn = np.sqrt(f_lisa * np.abs(lisa.Sn(f_lisa)))
+    plt.loglog(f_lisa, hn, label="LISA sensitivity", lw=1.5, ls='--', color='black', alpha=0.6)
+
+    # 2. Itération sur ton dictionnaire grb_params_data
+    # On utilise .items() pour avoir le nom ("BOAT") et les params ({...})
+    for name, data in grb_dict.items():
+        # On fait une copie pour ne pas polluer le dictionnaire original
+        params = data.copy()
+        
+        # Ajout des valeurs par défaut
+        params.setdefault("phi_ej", 0.0)
+        params.setdefault("beta", 0.99)
+        params.setdefault("t_dec", DEFAULT_TDEC)
+        params.setdefault("t_jet_break", DEFAULT_TJET)
+        
+        # Calcul
+        f, hc = compute_hc_grb_only(params)
+        
+        # Plot avec le nom du GRB comme label
+        plt.loglog(f, hc, label=f"{name}", lw=2)
+
+    # Cosmétique
+    plt.xlabel("f [Hz]", fontsize=14)
+    plt.ylabel(r"$h_c$", fontsize=14)
+    plt.xlim(1e-4, 1e-1)
+    plt.ylim(1e-30, 1e-21)
+    plt.legend(fontsize=10, loc='best', frameon=True)
+    plt.grid(True, which="both", ls=':', alpha=0.5)
+    plt.tight_layout()
+    
+    path = os.path.join(outdir, fname)
+    plt.savefig(path, dpi=200)
+    plt.close()
+    print(f"Figure saved to {path}")
 
 if __name__ == "__main__":
     outdir = "results_snr_heatmap_grb_newmodel"
@@ -370,30 +416,20 @@ if __name__ == "__main__":
         "GRB 170817A": {
             "E_grb": 3e46, "E_aft": 10**52.2, "r": 40.0* 1e6,
             "theta_j": 0.3, "theta": np.deg2rad(32), 'T_90': 2
-        }
+        },
+        "GRB 221009A": {
+            "E_grb": 7.6e51, "E_aft": 5e52, 'r': 350.0* 1e6, 'T_90': 51.37, 'theta_j': np.deg2rad(0.04),
+            'theta': np.deg2rad(30)
+            }
+        
     }
     print("GRB parameters:", grb_params_data)
-    calculate_and_print_grb_snrs(grb_params_data)
-    grb_parameters_list = []
-    for name, params in grb_params_data.items():
-        full_params = {
-            "name": name,
-            "phi_ej": 0.0,
-            "beta": 0.99,
-            "t_dec": DEFAULT_TDEC,
-            "t_jet_break": DEFAULT_TJET  
-        }
-        full_params.update(params)
-        grb_parameters_list.append(full_params)
-    print("Starting SNR heatmap computation...")
-
-    # t_dec vs t_jet_break
-    param_dict3 = {
-        't_dec': np.logspace(0, 8, 250),
-        't_jet_break': np.logspace(0, 8, 250),
-        'E_grb': 5e52, 'E_aft': 5e54, 'r': 1e6, 'theta': np.deg2rad(10),
-        'T_90': 10
-    }
-    plot_heatmap_snr(param_dict3, outdir=outdir, xscale='log', yscale='log', grb_parameters_list=None)
+   
   
-    
+    params = {
+        'd': np.logspace(5, 10.5, 200),
+        'E_aft': np.logspace(48, 60, 200),
+        "E_grb": 1e52
+    }
+    plot_heatmap_snr(params, outdir, xscale="log", yscale="log", grb_parameters_list=list(grb_params_data.values()))
+   
